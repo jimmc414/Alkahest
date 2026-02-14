@@ -1,0 +1,25 @@
+[
+    // === Gunpowder combustion ===
+    // Gunpowder + Fire -> Air + Fire (explosive combustion with massive pressure)
+    (
+        name: "Gunpowder+Fire explosion",
+        input_a: 12,
+        input_b: 5,
+        output_a: 0,
+        output_b: 5,
+        probability: 1.0,
+        temp_delta: 500,
+        pressure_delta: 60,
+    ),
+    // Gunpowder + Lava -> Air + Lava (lava ignites gunpowder)
+    (
+        name: "Gunpowder+Lava explosion",
+        input_a: 12,
+        input_b: 11,
+        output_a: 0,
+        output_b: 11,
+        probability: 0.9,
+        temp_delta: 400,
+        pressure_delta: 55,
+    ),
+]
