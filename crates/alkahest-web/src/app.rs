@@ -297,6 +297,56 @@ impl Application {
         None
     }
 
+    /// Compute all chunks overlapping a brush centered at world-space (wx, wy, wz) with given radius.
+    /// For each overlapping chunk, returns (chunk_dispatch_idx, local_center_x, local_center_y, local_center_z).
+    /// The local center may be outside [0,CHUNK_SIZE) — the shader's in_bounds() clips per-voxel.
+    fn brush_affected_chunks(
+        wx: i32,
+        wy: i32,
+        wz: i32,
+        radius: u32,
+        dispatch_list: &alkahest_world::dispatch::DispatchList,
+    ) -> Vec<(u32, i32, i32, i32)> {
+        let cs = CHUNK_SIZE as i32;
+        let r = radius as i32;
+
+        if r == 0 {
+            // Single voxel: just the one chunk
+            if let Some(result) = Self::world_to_dispatch_coords(wx, wy, wz, dispatch_list) {
+                return vec![result];
+            }
+            return Vec::new();
+        }
+
+        // Compute chunk range the brush can touch
+        let min_cx = (wx - r).div_euclid(cs);
+        let max_cx = (wx + r).div_euclid(cs);
+        let min_cy = (wy - r).div_euclid(cs);
+        let max_cy = (wy + r).div_euclid(cs);
+        let min_cz = (wz - r).div_euclid(cs);
+        let max_cz = (wz + r).div_euclid(cs);
+
+        let mut results = Vec::new();
+        for cz in min_cz..=max_cz {
+            for cy in min_cy..=max_cy {
+                for cx in min_cx..=max_cx {
+                    let chunk_coord = glam::IVec3::new(cx, cy, cz);
+                    for (i, entry) in dispatch_list.entries.iter().enumerate() {
+                        if entry.coord == chunk_coord {
+                            // Express brush center in this chunk's local space
+                            let lx = wx - cx * cs;
+                            let ly = wy - cy * cs;
+                            let lz = wz - cz * cs;
+                            results.push((i as u32, lx, ly, lz));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        results
+    }
+
     /// Render a single frame.
     fn render_frame(&mut self) {
         // Destructure self for disjoint field borrows
@@ -404,7 +454,7 @@ impl Application {
                     camera.zoom(input.scroll_delta);
                 }
 
-                // Right-click: place/remove voxels (world-space → local + dispatch idx)
+                // Right-click: place/remove voxels with multi-chunk brush
                 if input.right_button_down {
                     let target = camera.target;
                     let wx = target.x as i32;
@@ -412,8 +462,8 @@ impl Application {
                     let wz = target.z as i32;
                     let br = tool_state.brush.radius;
                     let bs = tool_state.brush.shape.as_u32();
-                    if let Some((cdi, lx, ly, lz)) =
-                        Self::world_to_dispatch_coords(wx, wy, wz, &dispatch_list)
+                    for (cdi, lx, ly, lz) in
+                        Self::brush_affected_chunks(wx, wy, wz, br, &dispatch_list)
                     {
                         if input.shift_down {
                             tools::remove::execute(sim, lx, ly, lz, cdi, br, bs);
@@ -425,7 +475,7 @@ impl Application {
                     }
                 }
 
-                // H key: heat tool (apply to voxel at camera target)
+                // H key: heat tool with brush
                 if input.keys_down.contains("h") {
                     let target = camera.target;
                     let wx = target.x as i32;
@@ -433,8 +483,8 @@ impl Application {
                     let wz = target.z as i32;
                     let br = tool_state.brush.radius;
                     let bs = tool_state.brush.shape.as_u32();
-                    if let Some((cdi, lx, ly, lz)) =
-                        Self::world_to_dispatch_coords(wx, wy, wz, &dispatch_list)
+                    for (cdi, lx, ly, lz) in
+                        Self::brush_affected_chunks(wx, wy, wz, br, &dispatch_list)
                     {
                         tools::heat::execute_heat(
                             sim,
@@ -449,7 +499,7 @@ impl Application {
                     }
                 }
 
-                // F key: freeze tool (apply to voxel at camera target)
+                // F key: freeze tool with brush
                 if input.keys_down.contains("f") {
                     let target = camera.target;
                     let wx = target.x as i32;
@@ -457,8 +507,8 @@ impl Application {
                     let wz = target.z as i32;
                     let br = tool_state.brush.radius;
                     let bs = tool_state.brush.shape.as_u32();
-                    if let Some((cdi, lx, ly, lz)) =
-                        Self::world_to_dispatch_coords(wx, wy, wz, &dispatch_list)
+                    for (cdi, lx, ly, lz) in
+                        Self::brush_affected_chunks(wx, wy, wz, br, &dispatch_list)
                     {
                         tools::heat::execute_heat(
                             sim,
