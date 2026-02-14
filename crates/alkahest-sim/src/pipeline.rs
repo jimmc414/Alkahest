@@ -7,6 +7,7 @@ use crate::conflict::{build_movement_schedule, MovementUniforms, SubPass};
 pub use crate::passes::commands::SimCommand;
 use crate::passes::commands::{self, SimParams, MAX_COMMANDS};
 use crate::passes::movement;
+use crate::passes::pressure;
 use crate::passes::reactions;
 use crate::passes::thermal;
 
@@ -45,6 +46,7 @@ pub struct SimPipeline {
     movement_pipeline: wgpu::ComputePipeline,
     reaction_pipeline: wgpu::ComputePipeline,
     thermal_pipeline: wgpu::ComputePipeline,
+    pressure_pipeline: wgpu::ComputePipeline,
     activity_pipeline: wgpu::ComputePipeline,
     activity_bind_group_layout: wgpu::BindGroupLayout,
     activity_flags_buffer: wgpu::Buffer,
@@ -296,7 +298,10 @@ impl SimPipeline {
              const SENTINEL_NEIGHBOR: u32 = {}u;\n\
              const WORLD_CHUNKS_X: u32 = {}u;\n\
              const WORLD_CHUNKS_Y: u32 = {}u;\n\
-             const WORLD_CHUNKS_Z: u32 = {}u;\n",
+             const WORLD_CHUNKS_Z: u32 = {}u;\n\
+             const PRESSURE_DIFFUSION_RATE: f32 = {:.6};\n\
+             const MAX_PRESSURE: u32 = {}u;\n\
+             const THERMAL_PRESSURE_FACTOR: u32 = {}u;\n",
             CHUNK_SIZE,
             VOXELS_PER_CHUNK,
             alkahest_core::constants::DIFFUSION_RATE,
@@ -309,6 +314,9 @@ impl SimPipeline {
             alkahest_core::constants::WORLD_CHUNKS_X,
             alkahest_core::constants::WORLD_CHUNKS_Y,
             alkahest_core::constants::WORLD_CHUNKS_Z,
+            alkahest_core::constants::PRESSURE_DIFFUSION_RATE,
+            alkahest_core::constants::MAX_PRESSURE,
+            alkahest_core::constants::THERMAL_PRESSURE_FACTOR,
         );
         let types_wgsl = include_str!("../../../shaders/common/types.wgsl");
         let coords_wgsl = include_str!("../../../shaders/common/coords.wgsl");
@@ -317,6 +325,7 @@ impl SimPipeline {
         let movement_wgsl = include_str!("../../../shaders/sim/movement.wgsl");
         let reactions_wgsl = include_str!("../../../shaders/sim/reactions.wgsl");
         let thermal_wgsl = include_str!("../../../shaders/sim/thermal.wgsl");
+        let pressure_wgsl = include_str!("../../../shaders/sim/pressure.wgsl");
         let activity_wgsl = include_str!("../../../shaders/sim/activity.wgsl");
 
         let command_shader_source = format!(
@@ -331,6 +340,9 @@ impl SimPipeline {
         let thermal_shader_source = format!(
             "{constants_preamble}\n{types_wgsl}\n{coords_wgsl}\n{rng_wgsl}\n{thermal_wgsl}"
         );
+        let pressure_shader_source = format!(
+            "{constants_preamble}\n{types_wgsl}\n{coords_wgsl}\n{rng_wgsl}\n{pressure_wgsl}"
+        );
         let activity_shader_source = format!("{constants_preamble}\n{activity_wgsl}");
 
         let command_pipeline =
@@ -344,6 +356,8 @@ impl SimPipeline {
         );
         let thermal_pipeline =
             thermal::create_thermal_pipeline(device, &bind_group_layout, &thermal_shader_source);
+        let pressure_pipeline =
+            pressure::create_pressure_pipeline(device, &bind_group_layout, &pressure_shader_source);
         let activity_pipeline = crate::passes::activity::create_activity_pipeline(
             device,
             &activity_bind_group_layout,
@@ -366,6 +380,7 @@ impl SimPipeline {
             movement_pipeline,
             reaction_pipeline,
             thermal_pipeline,
+            pressure_pipeline,
             activity_pipeline,
             activity_bind_group_layout,
             activity_flags_buffer,
@@ -586,7 +601,33 @@ impl SimPipeline {
             );
         }
 
-        // Pass 5: Activity scan (separate bind group)
+        // Pass 5: Pressure accumulation, diffusion, rupture (batched)
+        {
+            let uniforms = ReactionUniforms {
+                tick: self.tick_count as u32,
+                material_count: self.material_count,
+                _pad0: 0,
+                _pad1: 0,
+                _pad2: 0,
+                _pad3: 0,
+                _pad4: 0,
+                _pad5: 0,
+            };
+            queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
+
+            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("sim-pressure-pass"),
+                timestamp_writes: None,
+            });
+            pressure::dispatch_pressure(
+                &mut pass,
+                &self.pressure_pipeline,
+                &bind_group,
+                active_chunk_count,
+            );
+        }
+
+        // Pass 6: Activity scan (separate bind group)
         {
             let activity_uniforms = ReactionUniforms {
                 tick: self.tick_count as u32,
