@@ -14,7 +14,7 @@ pub struct CompiledMaterialColor {
 
 /// Compiled GPU rule data ready for upload. Created once at init (C-PERF-2).
 pub struct GpuRuleData {
-    /// Material properties buffer: 32 bytes (2x vec4<f32>) per material.
+    /// Material properties buffer: 48 bytes (3x vec4<f32>) per material.
     pub material_props_buffer: wgpu::Buffer,
     /// Flat 2D lookup: `rule_lookup[a * material_count + b]` = rule index or NO_RULE.
     pub rule_lookup_buffer: wgpu::Buffer,
@@ -28,11 +28,12 @@ pub struct GpuRuleData {
     pub material_colors: Vec<CompiledMaterialColor>,
 }
 
-/// GPU material property layout: 2x vec4<f32> = 32 bytes per material.
+/// GPU material property layout: 3x vec4<f32> = 48 bytes per material.
 ///
 /// ```text
 /// vec4<f32>[0]: density, phase, flammability, ignition_temp_quantized
 /// vec4<f32>[1]: decay_rate, decay_threshold, decay_product_id, viscosity
+/// vec4<f32>[2]: thermal_conductivity, phase_change_temp_quantized, phase_change_product_id, _pad
 /// ```
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -45,6 +46,10 @@ struct GpuMaterialProps {
     decay_threshold: f32,
     decay_product_id: f32,
     viscosity: f32,
+    thermal_conductivity: f32,
+    phase_change_temp_quantized: f32,
+    phase_change_product_id: f32,
+    _pad: f32,
 }
 
 /// GPU rule data layout: 2x vec4<u32> = 32 bytes per rule entry.
@@ -81,6 +86,10 @@ pub fn compile(device: &wgpu::Device, materials: &MaterialTable, rules: &RuleSet
             decay_threshold: 0.0,
             decay_product_id: 0.0,
             viscosity: 0.0,
+            thermal_conductivity: 0.0,
+            phase_change_temp_quantized: 0.0,
+            phase_change_product_id: 0.0,
+            _pad: 0.0,
         };
         material_count as usize
     ];
@@ -97,6 +106,10 @@ pub fn compile(device: &wgpu::Device, materials: &MaterialTable, rules: &RuleSet
                 decay_threshold: mat.decay_threshold as f32,
                 decay_product_id: mat.decay_product as f32,
                 viscosity: mat.viscosity,
+                thermal_conductivity: mat.thermal_conductivity,
+                phase_change_temp_quantized: temp_to_quantized(mat.phase_change_temp) as f32,
+                phase_change_product_id: mat.phase_change_product as f32,
+                _pad: 0.0,
             };
         }
     }
