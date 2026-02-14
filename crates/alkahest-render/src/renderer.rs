@@ -15,6 +15,9 @@ pub struct CameraUniforms {
     pub screen_size: [f32; 2],
     pub near: f32,
     pub fov: f32,
+    /// Render mode: 0 = normal, 1 = heatmap.
+    pub render_mode: u32,
+    pub _pad_rm: [u32; 3],
 }
 
 /// GPU-uploadable light uniforms. Must match LightUniforms in ray_march.wgsl.
@@ -676,7 +679,7 @@ impl Renderer {
     }
 
     /// Build the material color table (C-DESIGN-1: no hardcoded materials in shaders).
-    /// Provides initial fallback colors for 10 materials. Updated at init by rule engine output.
+    /// Provides initial fallback colors for 12 materials. Updated at init by rule engine output.
     fn build_material_colors() -> Vec<MaterialColor> {
         vec![
             // 0: Air (never rendered, but need valid entry)
@@ -728,6 +731,16 @@ impl Renderer {
             MaterialColor {
                 color: [0.7, 0.7, 0.65],
                 emission: 0.0,
+            },
+            // 10: Ice
+            MaterialColor {
+                color: [0.7, 0.85, 0.95],
+                emission: 0.1,
+            },
+            // 11: Lava
+            MaterialColor {
+                color: [1.0, 0.3, 0.0],
+                emission: 4.0,
             },
         ]
     }

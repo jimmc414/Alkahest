@@ -13,6 +13,10 @@ struct CameraUniforms {
     screen_size: vec2<f32>,
     near: f32,
     fov: f32,
+    render_mode: u32,
+    _pad_rm0: u32,
+    _pad_rm1: u32,
+    _pad_rm2: u32,
 }
 
 struct LightUniforms {
@@ -56,6 +60,36 @@ fn sample_voxel(pos: vec3<i32>) -> u32 {
     let idx = voxel_index(pos);
     let v = voxel_buffer[idx];
     return unpack_material_id(v);
+}
+
+// Sample voxel temperature at integer position (0 if out of bounds or air).
+fn sample_temperature(pos: vec3<i32>) -> u32 {
+    if !in_bounds(pos) {
+        return 0u;
+    }
+    let idx = voxel_index(pos);
+    let v = voxel_buffer[idx];
+    return unpack_temperature(v);
+}
+
+// Convert temperature to heatmap color: blue(cold) -> cyan -> green -> yellow -> red(hot).
+fn heatmap_color(temp: u32) -> vec3<f32> {
+    // Normalize to [0,1] range over 0-4095 quantized range
+    let t = clamp(f32(temp) / 4095.0, 0.0, 1.0);
+    // 5-stop gradient: blue -> cyan -> green -> yellow -> red
+    if t < 0.25 {
+        let f = t / 0.25;
+        return mix(vec3<f32>(0.0, 0.0, 1.0), vec3<f32>(0.0, 1.0, 1.0), f);
+    } else if t < 0.5 {
+        let f = (t - 0.25) / 0.25;
+        return mix(vec3<f32>(0.0, 1.0, 1.0), vec3<f32>(0.0, 1.0, 0.0), f);
+    } else if t < 0.75 {
+        let f = (t - 0.5) / 0.25;
+        return mix(vec3<f32>(0.0, 1.0, 0.0), vec3<f32>(1.0, 1.0, 0.0), f);
+    } else {
+        let f = (t - 0.75) / 0.25;
+        return mix(vec3<f32>(1.0, 1.0, 0.0), vec3<f32>(1.0, 0.0, 0.0), f);
+    }
 }
 
 // DDA ray march. Returns hit info: (did_hit, hit_position, normal, material_id).
@@ -337,6 +371,30 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
                 break;
             }
         }
+    }
+
+    // Heatmap mode: render temperature as color gradient
+    if camera.render_mode == 1u {
+        // Re-trace to find the hit voxel position for temperature sampling
+        var heatmap_voxel = trace_voxel;
+        if start_mat_check == 0u {
+            // Find the hit voxel by re-tracing (already done above for hit_pos)
+            heatmap_voxel = trace_voxel; // trace_voxel was updated in the DDA loop above
+        }
+        let temp = sample_temperature(heatmap_voxel);
+        let heat_color = heatmap_color(temp);
+
+        // Apply basic shading to heatmap
+        let surface_pos_h = hit_pos + normal * 0.001;
+        let to_light_h = light.position.xyz - surface_pos_h;
+        let light_dist_h = length(to_light_h);
+        let light_dir_h = to_light_h / max(light_dist_h, 0.001);
+        let n_dot_l_h = max(dot(normal, light_dir_h), 0.0);
+        let shading = 0.3 + 0.7 * n_dot_l_h;
+
+        let final_heat = heat_color * shading;
+        textureStore(output_texture, vec2<u32>(global_id.xy), vec4<f32>(clamp(final_heat, vec3<f32>(0.0), vec3<f32>(1.0)), 1.0));
+        return;
     }
 
     // Material color (C-DESIGN-1: no hardcoded material checks)
