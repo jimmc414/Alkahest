@@ -9,6 +9,7 @@
         decay_rate: 3,
         decay_threshold: 512,
         decay_product: 6,
+        thermal_conductivity: 0.01,
     ),
     (
         id: 6,
@@ -20,6 +21,7 @@
         decay_rate: 1,
         decay_threshold: 100,
         decay_product: 0,
+        thermal_conductivity: 0.01,
     ),
     (
         id: 7,
@@ -31,5 +33,19 @@
         decay_rate: 1,
         decay_threshold: 120,
         decay_product: 3,
+        thermal_conductivity: 0.05,
+    ),
+    (
+        id: 11,
+        name: "Lava",
+        phase: Liquid,
+        density: 2800.0,
+        color: (1.0, 0.3, 0.0),
+        emission: 4.0,
+        viscosity: 0.6,
+        thermal_conductivity: 0.9,
+        decay_rate: 1,
+        decay_threshold: 614,
+        decay_product: 1,
     ),
 ]

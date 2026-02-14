@@ -8,6 +8,7 @@
         emission: 0.0,
         flammability: 0.8,
         ignition_temp: 500.0,
+        thermal_conductivity: 0.15,
     ),
     (
         id: 4,
@@ -19,5 +20,6 @@
         flammability: 0.9,
         ignition_temp: 400.0,
         viscosity: 0.3,
+        thermal_conductivity: 0.4,
     ),
 ]
