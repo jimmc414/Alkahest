@@ -1,3 +1,4 @@
+pub mod heat;
 pub mod place;
 pub mod remove;
 

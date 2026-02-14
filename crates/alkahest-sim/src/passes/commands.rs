@@ -20,6 +20,8 @@ pub struct SimCommand {
 pub const TOOL_PLACE: u32 = 1;
 #[allow(dead_code)]
 pub const TOOL_REMOVE: u32 = 2;
+#[allow(dead_code)]
+pub const TOOL_HEAT: u32 = 3;
 
 /// GPU-uploadable simulation parameters. Must match SimParams in commands.wgsl.
 #[repr(C)]

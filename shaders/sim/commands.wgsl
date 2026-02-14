@@ -5,13 +5,14 @@
 // Buffers:
 //   @group(0) @binding(0) read_buf    — storage, read
 //   @group(0) @binding(1) write_buf   — storage, read_write
-//   @group(0) @binding(2) materials   — storage, read (material properties, 2x vec4<f32> per material)
+//   @group(0) @binding(2) materials   — storage, read (material properties, 3x vec4<f32> per material)
 //   @group(0) @binding(3) cmd_buf     — storage, read (command array)
 //   @group(0) @binding(4) sim_params  — uniform (tick, command_count, etc.)
 
 // Command tool types
 const TOOL_PLACE: u32 = 1u;
 const TOOL_REMOVE: u32 = 2u;
+const TOOL_HEAT: u32 = 3u;
 
 struct SimCommand {
     tool_type: u32,
@@ -62,7 +63,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
             let mat_id = cmd.material_id;
             if mat_id > 0u {
                 // props_1 = (decay_rate, decay_threshold, decay_product_id, viscosity)
-                let props_1 = materials[mat_id * 2u + 1u];
+                let props_1 = materials[mat_id * 3u + 1u];
                 let decay_rate = u32(props_1.x);
                 let decay_threshold = u32(props_1.y);
                 if decay_rate > 0u && decay_threshold > 0u {
@@ -75,6 +76,19 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         case 2u: {
             // REMOVE: write air (material 0) at position
             write_buf[idx] = vec2<u32>(0u, 0u);
+        }
+        case 3u: {
+            // HEAT: modify temperature of existing voxel
+            // material_id field is reused as signed temperature delta
+            let current_voxel = write_buf[idx];
+            let current_mat = unpack_material_id(current_voxel);
+            if current_mat != 0u {
+                let current_temp = unpack_temperature(current_voxel);
+                let delta = bitcast<i32>(cmd.material_id);
+                var new_temp = i32(current_temp) + delta;
+                new_temp = clamp(new_temp, 0, 4095);
+                write_buf[idx] = repack_material_temp(current_voxel, current_mat, u32(new_temp));
+            }
         }
         default: {}
     }
