@@ -1,12 +1,13 @@
 [package]
-name = "alkahest-sim"
+name = "alkahest-rules"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 alkahest-core = { path = "../alkahest-core" }
-alkahest-rules = { path = "../alkahest-rules" }
 wgpu = { workspace = true }
-glam = { workspace = true }
 bytemuck = { workspace = true }
+serde = { workspace = true }
+ron = { workspace = true }
 log = { workspace = true }
+thiserror = { workspace = true }

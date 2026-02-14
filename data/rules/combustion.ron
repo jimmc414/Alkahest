@@ -1,0 +1,151 @@
+[
+    // === Combustion reactions ===
+    // Fire + Wood -> Fire + Ash (wood burns to ash)
+    (
+        name: "Fire+Wood combustion",
+        input_a: 5,
+        input_b: 8,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.8,
+        temp_delta: 200,
+    ),
+    // Fire + Oil -> Fire + Smoke (oil burns to smoke)
+    (
+        name: "Fire+Oil combustion",
+        input_a: 5,
+        input_b: 4,
+        output_a: 5,
+        output_b: 6,
+        probability: 0.9,
+        temp_delta: 100,
+    ),
+
+    // === Extinguishing reactions ===
+    // Fire + Water -> Air + Steam (water puts out fire)
+    (
+        name: "Fire+Water extinguish",
+        input_a: 5,
+        input_b: 3,
+        output_a: 0,
+        output_b: 7,
+        probability: 1.0,
+    ),
+
+    // === Cooling reactions ===
+    // Fire + Sand -> Fire + Sand (sand cools fire slightly)
+    (
+        name: "Fire+Sand cooling",
+        input_a: 5,
+        input_b: 2,
+        output_a: 5,
+        output_b: 2,
+        probability: 0.5,
+        temp_delta: -50,
+    ),
+
+    // === Inert reactions (no material change, included for completeness) ===
+    // Fire + Stone -> unchanged
+    (
+        name: "Fire+Stone inert",
+        input_a: 5,
+        input_b: 1,
+        output_a: 5,
+        output_b: 1,
+        probability: 0.3,
+        temp_delta: -20,
+    ),
+    // Fire + Ash -> unchanged
+    (
+        name: "Fire+Ash inert",
+        input_a: 5,
+        input_b: 9,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.2,
+        temp_delta: -10,
+    ),
+    // Fire + Smoke -> unchanged
+    (
+        name: "Fire+Smoke inert",
+        input_a: 5,
+        input_b: 6,
+        output_a: 5,
+        output_b: 6,
+        probability: 0.1,
+        temp_delta: -5,
+    ),
+    // Fire + Steam -> unchanged (steam cools fire)
+    (
+        name: "Fire+Steam cooling",
+        input_a: 5,
+        input_b: 7,
+        output_a: 5,
+        output_b: 7,
+        probability: 0.5,
+        temp_delta: -30,
+    ),
+    // Fire + Fire -> unchanged
+    (
+        name: "Fire+Fire inert",
+        input_a: 5,
+        input_b: 5,
+        output_a: 5,
+        output_b: 5,
+        probability: 0.0,
+    ),
+    // Wood + Water -> unchanged
+    (
+        name: "Wood+Water inert",
+        input_a: 8,
+        input_b: 3,
+        output_a: 8,
+        output_b: 3,
+        probability: 0.0,
+    ),
+    // Oil + Water -> unchanged (immiscible, density handles separation)
+    (
+        name: "Oil+Water immiscible",
+        input_a: 4,
+        input_b: 3,
+        output_a: 4,
+        output_b: 3,
+        probability: 0.0,
+    ),
+    // Water + Sand -> unchanged
+    (
+        name: "Water+Sand inert",
+        input_a: 3,
+        input_b: 2,
+        output_a: 3,
+        output_b: 2,
+        probability: 0.0,
+    ),
+    // Steam + Stone -> unchanged
+    (
+        name: "Steam+Stone inert",
+        input_a: 7,
+        input_b: 1,
+        output_a: 7,
+        output_b: 1,
+        probability: 0.0,
+    ),
+    // Smoke + Wood -> unchanged
+    (
+        name: "Smoke+Wood inert",
+        input_a: 6,
+        input_b: 8,
+        output_a: 6,
+        output_b: 8,
+        probability: 0.0,
+    ),
+    // Fire + Air -> unchanged (fire in open air, decay handles lifetime)
+    (
+        name: "Fire+Air inert",
+        input_a: 5,
+        input_b: 0,
+        output_a: 5,
+        output_b: 0,
+        probability: 0.0,
+    ),
+]

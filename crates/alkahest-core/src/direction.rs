@@ -75,6 +75,28 @@ pub const GRAVITY_DIRECTIONS: [Direction; 5] = [
     Direction::DownSouthEast,
 ];
 
+/// M3 movement directions: gravity (powder+liquid), lateral (liquid), rise (gas).
+/// 14 directions dispatched in this fixed order (C-SIM-2).
+pub const MOVEMENT_DIRECTIONS: [Direction; 14] = [
+    // Gravity (POWDER + LIQUID fall)
+    Direction::Down,
+    Direction::DownNorthWest,
+    Direction::DownNorthEast,
+    Direction::DownSouthWest,
+    Direction::DownSouthEast,
+    // Lateral (LIQUID flow)
+    Direction::North,
+    Direction::South,
+    Direction::East,
+    Direction::West,
+    // Rise (GAS ascend)
+    Direction::Up,
+    Direction::UpNorthWest,
+    Direction::UpNorthEast,
+    Direction::UpSouthWest,
+    Direction::UpSouthEast,
+];
+
 impl Direction {
     /// Offset vector for this direction. Y-up convention: Down = (0,-1,0).
     pub fn offset(self) -> IVec3 {

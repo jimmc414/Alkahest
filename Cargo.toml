@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/alkahest-core",
     "crates/alkahest-render",
+    "crates/alkahest-rules",
     "crates/alkahest-sim",
     "crates/alkahest-web",
 ]
@@ -31,6 +32,8 @@ glam = "=0.29.2"
 
 # Serialization / GPU data
 bytemuck = { version = "=1.21.0", features = ["derive"] }
+serde = { version = "=1.0.217", features = ["derive"] }
+ron = "=0.8.1"
 
 # Error handling
 thiserror = "=2.0.11"

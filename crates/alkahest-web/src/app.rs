@@ -4,13 +4,18 @@ use crate::input::InputState;
 use crate::tools::{self, ToolState};
 use crate::ui::debug::DebugPanel;
 use crate::ui::UiState;
-use alkahest_render::Renderer;
+use alkahest_render::{MaterialColor, Renderer};
 use alkahest_sim::pipeline::SimPipeline;
 use std::cell::RefCell;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 
 type RafClosure = Rc<RefCell<Option<Closure<dyn FnMut(f64)>>>>;
+
+/// Material names for debug display, indexed by material ID.
+const MATERIAL_NAMES: &[&str] = &[
+    "Air", "Stone", "Sand", "Water", "Oil", "Fire", "Smoke", "Steam", "Wood", "Ash",
+];
 
 /// Main application struct. Owns all subsystems.
 pub struct Application {
@@ -31,9 +36,24 @@ impl Application {
 
         let width = gpu.surface_config.width;
         let height = gpu.surface_config.height;
-        let renderer = Renderer::new(&gpu.device, &gpu.queue, gpu.surface_format, width, height);
+        let mut renderer =
+            Renderer::new(&gpu.device, &gpu.queue, gpu.surface_format, width, height);
 
-        let sim = SimPipeline::new(&gpu.device, &gpu.queue);
+        // Load and compile rule engine data (M3)
+        let rule_data = Self::load_rules(&gpu.device);
+
+        // Update renderer material colors from compiled data
+        let material_colors: Vec<MaterialColor> = rule_data
+            .material_colors
+            .iter()
+            .map(|c| MaterialColor {
+                color: c.color,
+                emission: c.emission,
+            })
+            .collect();
+        renderer.update_material_colors(&gpu.device, &material_colors);
+
+        let sim = SimPipeline::new(&gpu.device, &gpu.queue, rule_data);
 
         let debug_panel = DebugPanel::new(gpu.adapter_name.clone(), gpu.backend.clone());
         let tool_state = ToolState::new();
@@ -50,6 +70,44 @@ impl Application {
             tool_state,
             last_frame_time: 0.0,
         }
+    }
+
+    /// Load, validate, and compile rule engine data from embedded RON files.
+    fn load_rules(device: &wgpu::Device) -> alkahest_rules::GpuRuleData {
+        // Embed RON data at compile time (avoids async fetch for M3)
+        let naturals_ron = include_str!("../../../data/materials/naturals.ron");
+        let organics_ron = include_str!("../../../data/materials/organics.ron");
+        let energy_ron = include_str!("../../../data/materials/energy.ron");
+        let combustion_ron = include_str!("../../../data/rules/combustion.ron");
+
+        let materials =
+            alkahest_rules::loader::load_all_materials(&[naturals_ron, organics_ron, energy_ron])
+                .expect("failed to parse material RON data");
+
+        let rules = alkahest_rules::loader::load_all_rules(&[combustion_ron])
+            .expect("failed to parse rules RON data");
+
+        // Validate
+        if let Err(errors) = alkahest_rules::validator::validate_materials(&materials) {
+            for e in &errors {
+                log::error!("Material validation error: {e}");
+            }
+            panic!("Material validation failed with {} errors", errors.len());
+        }
+        if let Err(errors) = alkahest_rules::validator::validate_rules(&rules, &materials) {
+            for e in &errors {
+                log::error!("Rule validation error: {e}");
+            }
+            panic!("Rule validation failed with {} errors", errors.len());
+        }
+
+        log::info!(
+            "Loaded {} materials and {} rules",
+            materials.len(),
+            rules.len()
+        );
+
+        alkahest_rules::compiler::compile(device, &materials, &rules)
     }
 
     /// Start the requestAnimationFrame loop.
@@ -142,6 +200,24 @@ impl Application {
             }
             if input.was_just_pressed(".") {
                 sim.single_step();
+            }
+
+            // Number keys 1-9: select material for placement
+            for key in 1..=9u32 {
+                let key_str = key.to_string();
+                if input.was_just_pressed(&key_str) {
+                    tool_state.place_material = key;
+                    log::info!(
+                        "Selected material: {} ({})",
+                        MATERIAL_NAMES.get(key as usize).unwrap_or(&"Unknown"),
+                        key
+                    );
+                }
+            }
+            // Key 0: select air (erase)
+            if input.was_just_pressed("0") {
+                tool_state.place_material = 0;
+                log::info!("Selected material: Air (0)");
             }
 
             // Check if egui wants pointer input — if so, suppress camera controls

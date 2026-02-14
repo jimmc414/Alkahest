@@ -606,6 +606,23 @@ impl Renderer {
         );
     }
 
+    /// Update material colors from compiled rule data. Called once at init (C-PERF-2).
+    pub fn update_material_colors(&mut self, device: &wgpu::Device, colors: &[MaterialColor]) {
+        self.material_color_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("material-colors"),
+            contents: bytemuck::cast_slice(colors),
+            usage: wgpu::BufferUsages::STORAGE,
+        });
+        // Recreate scene bind group with new material color buffer
+        self.scene_bind_group = Self::create_scene_bind_group(
+            device,
+            &self.scene_bgl,
+            &self.voxel_buffer,
+            &self.material_color_buffer,
+            &self.render_texture_view,
+        );
+    }
+
     // -- Private helpers --
 
     fn create_storage_texture(
@@ -659,6 +676,7 @@ impl Renderer {
     }
 
     /// Build the material color table (C-DESIGN-1: no hardcoded materials in shaders).
+    /// Provides initial fallback colors for 10 materials. Updated at init by rule engine output.
     fn build_material_colors() -> Vec<MaterialColor> {
         vec![
             // 0: Air (never rendered, but need valid entry)
@@ -676,10 +694,40 @@ impl Renderer {
                 color: [0.76, 0.70, 0.50],
                 emission: 0.0,
             },
-            // 3: Emissive
+            // 3: Water
             MaterialColor {
-                color: [1.0, 0.9, 0.6],
+                color: [0.2, 0.4, 0.8],
+                emission: 0.1,
+            },
+            // 4: Oil
+            MaterialColor {
+                color: [0.3, 0.2, 0.05],
+                emission: 0.0,
+            },
+            // 5: Fire
+            MaterialColor {
+                color: [1.0, 0.5, 0.1],
                 emission: 5.0,
+            },
+            // 6: Smoke
+            MaterialColor {
+                color: [0.3, 0.3, 0.3],
+                emission: 0.0,
+            },
+            // 7: Steam
+            MaterialColor {
+                color: [0.85, 0.85, 0.9],
+                emission: 0.05,
+            },
+            // 8: Wood
+            MaterialColor {
+                color: [0.45, 0.28, 0.12],
+                emission: 0.0,
+            },
+            // 9: Ash
+            MaterialColor {
+                color: [0.7, 0.7, 0.65],
+                emission: 0.0,
             },
         ]
     }

@@ -1,0 +1,15 @@
+// Material Definition Schema
+//
+// Each material is a struct with the following fields:
+//   id: u16              - Stable ID (C-DATA-1). 0 = Air. Must be unique.
+//   name: String         - Human-readable name for debug display.
+//   phase: Phase         - Gas | Liquid | Solid | Powder
+//   density: f32         - Abstract density. Higher = sinks below lower.
+//   color: (f32,f32,f32) - RGB color (0.0-1.0 per channel).
+//   emission: f32        - Emission intensity (0.0 = none, 5.0 = bright).
+//   flammability: f32    - 0.0 = fireproof, 1.0 = highly flammable. (optional, default 0)
+//   ignition_temp: f32   - Kelvin. Max 8000K (C-DATA-4). (optional, default 0)
+//   decay_rate: u32      - Per-tick temperature decrement (quantized). (optional, default 0)
+//   decay_threshold: u32 - Transform threshold (quantized, max 4095). (optional, default 0)
+//   decay_product: u16   - Material ID to become on decay. (optional, default 0)
+//   viscosity: f32       - 0.0 = free flow, 1.0 = no flow. (optional, default 0)

@@ -5,18 +5,13 @@
 // Buffers:
 //   @group(0) @binding(0) read_buf    — storage, read
 //   @group(0) @binding(1) write_buf   — storage, read_write
-//   @group(0) @binding(2) materials   — storage, read (material properties)
+//   @group(0) @binding(2) materials   — storage, read (material properties, 2x vec4<f32> per material)
 //   @group(0) @binding(3) cmd_buf     — storage, read (command array)
 //   @group(0) @binding(4) sim_params  — uniform (tick, command_count, etc.)
 
 // Command tool types
 const TOOL_PLACE: u32 = 1u;
 const TOOL_REMOVE: u32 = 2u;
-
-// Phase constants
-const PHASE_GAS: u32 = 0u;
-const PHASE_SOLID: u32 = 2u;
-const PHASE_POWDER: u32 = 3u;
 
 struct SimCommand {
     tool_type: u32,
@@ -42,12 +37,6 @@ struct SimParams {
 @group(0) @binding(3) var<storage, read> cmd_buf: array<SimCommand>;
 @group(0) @binding(4) var<uniform> sim_params: SimParams;
 
-fn pack_voxel_simple(material_id: u32, temperature: u32) -> vec2<u32> {
-    let low = material_id | (temperature << 16u);
-    let high = 0u;
-    return vec2<u32>(low, high);
-}
-
 @compute @workgroup_size(64, 1, 1)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let cmd_index = gid.x;
@@ -66,8 +55,21 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     switch cmd.tool_type {
         case 1u: {
-            // PLACE: write material at position with ambient temperature
-            let voxel = pack_voxel_simple(cmd.material_id, 150u);
+            // PLACE: write material at position
+            // For materials with decay (e.g. fire), start at 3x decay_threshold
+            // so they don't immediately disappear. Otherwise use ambient temp.
+            var temp = 150u; // ambient
+            let mat_id = cmd.material_id;
+            if mat_id > 0u {
+                // props_1 = (decay_rate, decay_threshold, decay_product_id, viscosity)
+                let props_1 = materials[mat_id * 2u + 1u];
+                let decay_rate = u32(props_1.x);
+                let decay_threshold = u32(props_1.y);
+                if decay_rate > 0u && decay_threshold > 0u {
+                    temp = min(decay_threshold * 3u, 4095u);
+                }
+            }
+            let voxel = pack_voxel(mat_id, temp, 0, 0, 0, 0u, 0u);
             write_buf[idx] = voxel;
         }
         case 2u: {

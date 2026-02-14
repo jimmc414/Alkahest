@@ -1,0 +1,23 @@
+[
+    (
+        id: 8,
+        name: "Wood",
+        phase: Solid,
+        density: 3000.0,
+        color: (0.45, 0.28, 0.12),
+        emission: 0.0,
+        flammability: 0.8,
+        ignition_temp: 500.0,
+    ),
+    (
+        id: 4,
+        name: "Oil",
+        phase: Liquid,
+        density: 800.0,
+        color: (0.3, 0.2, 0.05),
+        emission: 0.0,
+        flammability: 0.9,
+        ignition_temp: 400.0,
+        viscosity: 0.3,
+    ),
+]

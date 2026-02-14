@@ -1,35 +1,33 @@
 use alkahest_core::constants::{CHUNK_SIZE, VOXELS_PER_CHUNK};
 use alkahest_core::math::pack_voxel;
 use alkahest_core::types::MaterialId;
-use wgpu::util::DeviceExt;
+
+use alkahest_rules::GpuRuleData;
 
 use crate::buffers::DoubleBuffer;
-use crate::conflict::{build_gravity_schedule, MovementUniforms, SubPass};
+use crate::conflict::{build_movement_schedule, MovementUniforms, SubPass};
 // Re-export SimCommand for external use (web crate needs it for player tools)
 pub use crate::passes::commands::SimCommand;
 use crate::passes::commands::{self, SimParams, MAX_COMMANDS};
 use crate::passes::movement;
-
-/// Material properties uploaded to the GPU. Must match `materials` buffer layout in shaders.
-/// vec4<f32>(density, phase, pad, pad)
-#[repr(C)]
-#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-struct MaterialProps {
-    density: f32,
-    phase: f32,
-    _pad0: f32,
-    _pad1: f32,
-}
-
-/// Phase constants matching the shader.
-const PHASE_GAS: f32 = 0.0;
-#[allow(dead_code)] // Used in M3 for liquid movement
-const PHASE_LIQUID: f32 = 1.0;
-const PHASE_SOLID: f32 = 2.0;
-const PHASE_POWDER: f32 = 3.0;
+use crate::passes::reactions;
 
 /// GPU debug buffer size (C-GPU-10).
 const DEBUG_BUFFER_SIZE: u64 = 4096;
+
+/// Reaction uniform struct uploaded each tick. Must match ReactionUniforms in reactions.wgsl.
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+struct ReactionUniforms {
+    tick: u32,
+    material_count: u32,
+    _pad0: u32,
+    _pad1: u32,
+    _pad2: u32,
+    _pad3: u32,
+    _pad4: u32,
+    _pad5: u32,
+}
 
 /// Single public struct owning the entire simulation pipeline.
 ///
@@ -37,6 +35,8 @@ const DEBUG_BUFFER_SIZE: u64 = 4096;
 pub struct SimPipeline {
     double_buffer: DoubleBuffer,
     material_props_buffer: wgpu::Buffer,
+    rule_lookup_buffer: wgpu::Buffer,
+    rule_data_buffer: wgpu::Buffer,
     command_buffer: wgpu::Buffer,
     uniform_buffer: wgpu::Buffer,
     #[allow(dead_code)] // Read back in debug builds for shader diagnostics (C-GPU-10)
@@ -44,7 +44,9 @@ pub struct SimPipeline {
     bind_group_layout: wgpu::BindGroupLayout,
     command_pipeline: wgpu::ComputePipeline,
     movement_pipeline: wgpu::ComputePipeline,
-    gravity_schedule: Vec<SubPass>,
+    reaction_pipeline: wgpu::ComputePipeline,
+    movement_schedule: Vec<SubPass>,
+    material_count: u32,
     pending_commands: Vec<SimCommand>,
     tick_count: u64,
     paused: bool,
@@ -53,7 +55,9 @@ pub struct SimPipeline {
 
 impl SimPipeline {
     /// Create the simulation pipeline with all GPU resources (C-PERF-2).
-    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue) -> Self {
+    ///
+    /// Accepts `GpuRuleData` from the rule engine compiler instead of building materials internally.
+    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, rule_data: GpuRuleData) -> Self {
         let double_buffer = DoubleBuffer::new(device);
 
         // Upload initial scene to both buffers
@@ -61,14 +65,6 @@ impl SimPipeline {
         let scene_bytes: &[u8] = bytemuck::cast_slice(&scene_data);
         queue.write_buffer(double_buffer.read_buffer(), 0, scene_bytes);
         queue.write_buffer(double_buffer.write_buffer(), 0, scene_bytes);
-
-        // Material properties buffer (C-DESIGN-1: density-driven, not material ID checks)
-        let material_props = Self::build_material_props();
-        let material_props_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("material-props"),
-            contents: bytemuck::cast_slice(&material_props),
-            usage: wgpu::BufferUsages::STORAGE,
-        });
 
         // Command buffer (fixed capacity, C-PERF-2)
         let command_buffer = device.create_buffer(&wgpu::BufferDescriptor {
@@ -78,10 +74,10 @@ impl SimPipeline {
             mapped_at_creation: false,
         });
 
-        // Uniform buffer for sim params / movement params (reused each sub-pass)
+        // Uniform buffer for sim params / movement params / reaction params (reused each sub-pass)
         let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("sim-uniform-buffer"),
-            size: 32, // max(sizeof(SimParams), sizeof(MovementUniforms)) = 32
+            size: 32, // max(sizeof(SimParams), sizeof(MovementUniforms), sizeof(ReactionUniforms)) = 32
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -96,9 +92,8 @@ impl SimPipeline {
             mapped_at_creation: false,
         });
 
-        // Shared bind group layout: both command and movement passes use the same layout.
-        // Storage buffers per shader: read(0) + write(1) + materials(2) + commands(3) = 4 storage
-        // + 1 uniform(4) = 5 bindings total, well within C-GPU-3 limit of 8.
+        // Shared bind group layout: 7 bindings (C-GPU-3: under limit of 8)
+        // 6 storage + 1 uniform = 7 total. One slot remains for M5.
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("sim-bind-group-layout"),
             entries: &[
@@ -124,7 +119,7 @@ impl SimPipeline {
                     },
                     count: None,
                 },
-                // binding 2: material properties (storage, read)
+                // binding 2: material properties (storage, read) — expanded to 32 bytes/material
                 wgpu::BindGroupLayoutEntry {
                     binding: 2,
                     visibility: wgpu::ShaderStages::COMPUTE,
@@ -157,6 +152,28 @@ impl SimPipeline {
                     },
                     count: None,
                 },
+                // binding 5: rule lookup (storage, read) — NEW for M3
+                wgpu::BindGroupLayoutEntry {
+                    binding: 5,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                // binding 6: rule data (storage, read) — NEW for M3
+                wgpu::BindGroupLayoutEntry {
+                    binding: 6,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
             ],
         });
 
@@ -170,6 +187,7 @@ impl SimPipeline {
         let rng_wgsl = include_str!("../../../shaders/common/rng.wgsl");
         let commands_wgsl = include_str!("../../../shaders/sim/commands.wgsl");
         let movement_wgsl = include_str!("../../../shaders/sim/movement.wgsl");
+        let reactions_wgsl = include_str!("../../../shaders/sim/reactions.wgsl");
 
         let command_shader_source = format!(
             "{constants_preamble}\n{types_wgsl}\n{coords_wgsl}\n{rng_wgsl}\n{commands_wgsl}"
@@ -177,24 +195,36 @@ impl SimPipeline {
         let movement_shader_source = format!(
             "{constants_preamble}\n{types_wgsl}\n{coords_wgsl}\n{rng_wgsl}\n{movement_wgsl}"
         );
+        let reactions_shader_source = format!(
+            "{constants_preamble}\n{types_wgsl}\n{coords_wgsl}\n{rng_wgsl}\n{reactions_wgsl}"
+        );
 
         let command_pipeline =
             commands::create_command_pipeline(device, &bind_group_layout, &command_shader_source);
         let movement_pipeline =
             movement::create_movement_pipeline(device, &bind_group_layout, &movement_shader_source);
+        let reaction_pipeline = reactions::create_reaction_pipeline(
+            device,
+            &bind_group_layout,
+            &reactions_shader_source,
+        );
 
-        let gravity_schedule = build_gravity_schedule();
+        let movement_schedule = build_movement_schedule();
 
         Self {
             double_buffer,
-            material_props_buffer,
+            material_props_buffer: rule_data.material_props_buffer,
+            rule_lookup_buffer: rule_data.rule_lookup_buffer,
+            rule_data_buffer: rule_data.rule_data_buffer,
             command_buffer,
             uniform_buffer,
             debug_buffer,
             bind_group_layout,
             command_pipeline,
             movement_pipeline,
-            gravity_schedule,
+            reaction_pipeline,
+            movement_schedule,
+            material_count: rule_data.material_count,
             pending_commands: Vec::new(),
             tick_count: 0,
             paused: false,
@@ -220,7 +250,7 @@ impl SimPipeline {
         }
     }
 
-    /// Run one simulation tick: dispatch Pass 1 (commands) + Pass 2 (movement sub-passes).
+    /// Run one simulation tick: Pass 1 (commands) + Pass 2 (movement) + Pass 3 (reactions).
     ///
     /// Returns true if the simulation actually ticked (not paused).
     pub fn tick(
@@ -231,7 +261,6 @@ impl SimPipeline {
     ) -> bool {
         // Check pause state
         if self.paused && !self.single_step_requested {
-            // Still process commands even while paused (they'll apply on resume)
             self.pending_commands.clear();
             return false;
         }
@@ -274,6 +303,14 @@ impl SimPipeline {
                     binding: 4,
                     resource: self.uniform_buffer.as_entire_binding(),
                 },
+                wgpu::BindGroupEntry {
+                    binding: 5,
+                    resource: self.rule_lookup_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 6,
+                    resource: self.rule_data_buffer.as_entire_binding(),
+                },
             ],
         });
 
@@ -299,8 +336,8 @@ impl SimPipeline {
             );
         }
 
-        // Pass 2: Movement sub-passes (C-SIM-2: fixed order)
-        for sub_pass in &self.gravity_schedule {
+        // Pass 2: Movement sub-passes (C-SIM-2: fixed order, 28 sub-passes)
+        for sub_pass in &self.movement_schedule {
             let uniforms = MovementUniforms {
                 direction: sub_pass.direction,
                 parity: sub_pass.parity,
@@ -314,6 +351,27 @@ impl SimPipeline {
                 timestamp_writes: None,
             });
             movement::dispatch_movement(&mut pass, &self.movement_pipeline, &bind_group);
+        }
+
+        // Pass 3: Reactions (C-SIM-3: reactions after movement)
+        {
+            let uniforms = ReactionUniforms {
+                tick: self.tick_count as u32,
+                material_count: self.material_count,
+                _pad0: 0,
+                _pad1: 0,
+                _pad2: 0,
+                _pad3: 0,
+                _pad4: 0,
+                _pad5: 0,
+            };
+            queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
+
+            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("sim-reactions-pass"),
+                timestamp_writes: None,
+            });
+            reactions::dispatch_reactions(&mut pass, &self.reaction_pipeline, &bind_group);
         }
 
         // Swap buffers and advance tick
@@ -359,8 +417,7 @@ impl SimPipeline {
         self.tick_count
     }
 
-    /// Build the M2 initial scene: stone floor + sand pyramid + emissive voxel.
-    /// Same layout as the M1 test scene in the renderer.
+    /// Build the M3 initial scene: stone floor, sand pyramid, wood block, water pool, fire starter.
     fn build_initial_scene() -> Vec<[u32; 2]> {
         let cs = CHUNK_SIZE as usize;
         let total = cs * cs * cs;
@@ -369,7 +426,9 @@ impl SimPipeline {
 
         let stone = pack_voxel(MaterialId(1), 150, 0, 0, 0, 0, 0);
         let sand = pack_voxel(MaterialId(2), 150, 0, 0, 0, 0, 0);
-        let emissive = pack_voxel(MaterialId(3), 150, 0, 0, 0, 0, 0);
+        let water = pack_voxel(MaterialId(3), 150, 0, 0, 0, 0, 0);
+        let wood = pack_voxel(MaterialId(8), 150, 0, 0, 0, 0, 0);
+        let fire = pack_voxel(MaterialId(5), 1536, 0, 0, 0, 0, 0); // ~3000K quantized
 
         // Stone floor at y=0
         for z in 0..cs {
@@ -379,14 +438,13 @@ impl SimPipeline {
             }
         }
 
-        // Sand pyramid: y=1..=8, centered at chunk center
-        let half = cs / 2;
-        for layer in 1u32..=8 {
-            let radius = (9 - layer) as i32;
-            let min_c = half as i32 - radius;
-            let max_c = half as i32 + radius;
-            for z in min_c..max_c {
-                for x in min_c..max_c {
+        // Sand pyramid: y=1..=5, centered at (8, _, 8)
+        for layer in 1u32..=5 {
+            let radius = (6 - layer) as i32;
+            let cx = 8i32;
+            let cz = 8i32;
+            for z in (cz - radius)..(cz + radius) {
+                for x in (cx - radius)..(cx + radius) {
                     if x >= 0 && x < cs as i32 && z >= 0 && z < cs as i32 {
                         let idx = x as usize + layer as usize * cs + z as usize * cs * cs;
                         data[idx] = [sand.low, sand.high];
@@ -395,46 +453,32 @@ impl SimPipeline {
             }
         }
 
-        // Emissive voxel at (28, 20, 28)
+        // Water pool: y=1..=3 at (20-24, _, 20-24)
+        for y in 1..=3u32 {
+            for z in 20..24 {
+                for x in 20..24 {
+                    let idx = x + y as usize * cs + z * cs * cs;
+                    data[idx] = [water.low, water.high];
+                }
+            }
+        }
+
+        // Wood block: 3x3x3 at (16, 1, 16)
+        for y in 1..=3u32 {
+            for z in 16..19 {
+                for x in 16..19 {
+                    let idx = x + y as usize * cs + z * cs * cs;
+                    data[idx] = [wood.low, wood.high];
+                }
+            }
+        }
+
+        // Fire starter: single voxel adjacent to wood at (15, 2, 17)
         {
-            let idx = 28 + 20 * cs + 28 * cs * cs;
-            data[idx] = [emissive.low, emissive.high];
+            let idx = 15 + 2 * cs + 17 * cs * cs;
+            data[idx] = [fire.low, fire.high];
         }
 
         data
-    }
-
-    /// Build M2 material properties table.
-    fn build_material_props() -> Vec<MaterialProps> {
-        vec![
-            // 0: Air
-            MaterialProps {
-                density: 0.0,
-                phase: PHASE_GAS,
-                _pad0: 0.0,
-                _pad1: 0.0,
-            },
-            // 1: Stone
-            MaterialProps {
-                density: 5000.0,
-                phase: PHASE_SOLID,
-                _pad0: 0.0,
-                _pad1: 0.0,
-            },
-            // 2: Sand
-            MaterialProps {
-                density: 2500.0,
-                phase: PHASE_POWDER,
-                _pad0: 0.0,
-                _pad1: 0.0,
-            },
-            // 3: Emissive
-            MaterialProps {
-                density: 1000.0,
-                phase: PHASE_SOLID,
-                _pad0: 0.0,
-                _pad1: 0.0,
-            },
-        ]
     }
 }

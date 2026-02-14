@@ -1,4 +1,4 @@
-// movement.wgsl — Pass 2: Gravity movement with checkerboard sub-passes.
+// movement.wgsl — Pass 2: Movement with checkerboard sub-passes.
 // Each sub-pass handles one direction with one checkerboard parity.
 // Dispatched multiple times per tick with different uniform parameters.
 //
@@ -7,14 +7,14 @@
 // Buffers:
 //   @group(0) @binding(0) read_buf    — storage, read (previous tick state)
 //   @group(0) @binding(1) write_buf   — storage, read_write (next tick state)
-//   @group(0) @binding(2) materials   — storage, read (material properties)
+//   @group(0) @binding(2) materials   — storage, read (material properties, 2x vec4<f32> per material)
 //   @group(0) @binding(3) cmd_buf     — storage, read (unused in this pass, shared layout)
 //   @group(0) @binding(4) move_params — uniform (direction, parity, tick)
 //
 // Algorithm:
 //   For each voxel in the checkerboard-filtered set:
 //   1. Read source voxel from write buffer (post-commands state)
-//   2. If source is air or solid phase, skip (density-driven, C-DESIGN-1)
+//   2. Phase-direction filter: downward allows POWDER+LIQUID, lateral allows LIQUID, upward allows GAS
 //   3. Read destination in the sub-pass direction from write buffer
 //   4. If destination is air: move source there, write air to source
 //   5. If destination has lower density: swap source and destination
@@ -26,8 +26,9 @@ const PHASE_LIQUID: u32 = 1u;
 const PHASE_SOLID: u32 = 2u;
 const PHASE_POWDER: u32 = 3u;
 
-// Material properties layout: vec4<f32>(density, phase_as_float, pad, pad)
-// density is f32, phase is stored as f32 but compared as u32
+// Material properties layout: 2x vec4<f32> per material
+// props_0 = materials[mat_id * 2u]:     (density, phase, flammability, ignition_temp_quantized)
+// props_1 = materials[mat_id * 2u + 1u]: (decay_rate, decay_threshold, decay_product_id, viscosity)
 
 struct MovementParams {
     dir_x: i32,
@@ -82,25 +83,53 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     }
 
     // Look up source material properties (density-driven movement, C-DESIGN-1)
-    let src_props = materials[src_mat_id];
-    let src_density = src_props.x;
-    let src_phase = u32(src_props.y);
+    // 2x vec4<f32> layout: props_0 at [mat_id * 2], props_1 at [mat_id * 2 + 1]
+    let src_props_0 = materials[src_mat_id * 2u];
+    let src_density = src_props_0.x;
+    let src_phase = u32(src_props_0.y);
 
-    // Solid phase doesn't move under gravity
+    // Solid phase doesn't move
     if src_phase == PHASE_SOLID {
         return;
     }
 
-    // Only powders move in M2 (skip liquid/gas for now — they'll be handled when those phases exist)
-    if src_phase != PHASE_POWDER {
-        return;
+    // Phase-direction filtering (C-DESIGN-1: no material-specific logic)
+    let dir_y = move_params.dir_y;
+    if dir_y < 0 {
+        // Downward directions: only POWDER and LIQUID
+        if src_phase != PHASE_POWDER && src_phase != PHASE_LIQUID {
+            return;
+        }
+    } else if dir_y == 0 {
+        // Lateral directions: only LIQUID
+        if src_phase != PHASE_LIQUID {
+            return;
+        }
+        // Viscosity-based probabilistic skip for lateral movement
+        let src_props_1 = materials[src_mat_id * 2u + 1u];
+        let viscosity = src_props_1.w;
+        if viscosity > 0.0 {
+            let h = sim_hash(pos.x, pos.y, pos.z, move_params.tick);
+            let roll = hash_to_float(h);
+            if roll < viscosity {
+                return;
+            }
+        }
+    } else {
+        // Upward directions: only GAS (skip air: density <= 0)
+        if src_phase != PHASE_GAS {
+            return;
+        }
+        if src_density <= 0.0 {
+            return;
+        }
     }
 
     // Compute destination position
     let dir = vec3<i32>(move_params.dir_x, move_params.dir_y, move_params.dir_z);
     let dst_pos = pos + dir;
 
-    // Out of bounds = blocked (chunk boundary, no cross-chunk at M2)
+    // Out of bounds = blocked (chunk boundary, no cross-chunk at M3)
     if !in_bounds(dst_pos) {
         return;
     }
@@ -118,9 +147,9 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     }
 
     // Density-driven displacement: if destination is lighter, swap
-    let dst_props = materials[dst_mat_id];
-    let dst_density = dst_props.x;
-    let dst_phase = u32(dst_props.y);
+    let dst_props_0 = materials[dst_mat_id * 2u];
+    let dst_density = dst_props_0.x;
+    let dst_phase = u32(dst_props_0.y);
 
     // Don't displace solids
     if dst_phase == PHASE_SOLID {

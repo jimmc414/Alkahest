@@ -1,4 +1,4 @@
-use alkahest_core::direction::GRAVITY_DIRECTIONS;
+use alkahest_core::direction::{GRAVITY_DIRECTIONS, MOVEMENT_DIRECTIONS};
 
 /// A single sub-pass in the movement dispatch schedule.
 ///
@@ -17,12 +17,35 @@ pub struct SubPass {
 ///
 /// For each gravity direction, dispatch twice: even parity then odd parity.
 /// This ensures no two simultaneously-processed voxels can target the same cell.
+/// Retained for backward compatibility with M2 tests; M3+ uses build_movement_schedule.
+#[allow(dead_code)]
 pub fn build_gravity_schedule() -> Vec<SubPass> {
     let mut schedule = Vec::with_capacity(GRAVITY_DIRECTIONS.len() * 2);
     for dir in GRAVITY_DIRECTIONS {
         let offset = dir.offset();
         let direction = [offset.x, offset.y, offset.z];
         // Even parity first, then odd
+        schedule.push(SubPass {
+            direction,
+            parity: 0,
+        });
+        schedule.push(SubPass {
+            direction,
+            parity: 1,
+        });
+    }
+    schedule
+}
+
+/// Build the M3 movement sub-pass schedule: 14 directions x 2 parities = 28 sub-passes.
+///
+/// Covers gravity (powder+liquid), lateral flow (liquid), and gas rise.
+/// Each direction dispatched with even parity then odd parity for conflict resolution.
+pub fn build_movement_schedule() -> Vec<SubPass> {
+    let mut schedule = Vec::with_capacity(MOVEMENT_DIRECTIONS.len() * 2);
+    for dir in MOVEMENT_DIRECTIONS {
+        let offset = dir.offset();
+        let direction = [offset.x, offset.y, offset.z];
         schedule.push(SubPass {
             direction,
             parity: 0,
@@ -94,6 +117,50 @@ mod tests {
         // Must be a multiple of 16 for WebGPU uniform alignment
         assert_eq!(std::mem::size_of::<MovementUniforms>(), 32);
         assert_eq!(std::mem::size_of::<MovementUniforms>() % 16, 0);
+    }
+
+    #[test]
+    fn test_movement_schedule_length() {
+        let schedule = build_movement_schedule();
+        // 14 directions * 2 parities = 28 sub-passes
+        assert_eq!(schedule.len(), 28);
+    }
+
+    #[test]
+    fn test_movement_schedule_parities() {
+        let schedule = build_movement_schedule();
+        for pair in schedule.chunks(2) {
+            assert_eq!(pair[0].parity, 0);
+            assert_eq!(pair[1].parity, 1);
+        }
+    }
+
+    #[test]
+    fn test_movement_schedule_has_lateral() {
+        let schedule = build_movement_schedule();
+        let has_north = schedule.iter().any(|sp| sp.direction == [0, 0, -1]);
+        let has_south = schedule.iter().any(|sp| sp.direction == [0, 0, 1]);
+        let has_east = schedule.iter().any(|sp| sp.direction == [1, 0, 0]);
+        let has_west = schedule.iter().any(|sp| sp.direction == [-1, 0, 0]);
+        assert!(has_north, "missing North");
+        assert!(has_south, "missing South");
+        assert!(has_east, "missing East");
+        assert!(has_west, "missing West");
+    }
+
+    #[test]
+    fn test_movement_schedule_has_rise() {
+        let schedule = build_movement_schedule();
+        let has_up = schedule.iter().any(|sp| sp.direction == [0, 1, 0]);
+        let has_up_nw = schedule.iter().any(|sp| sp.direction == [-1, 1, -1]);
+        let has_up_ne = schedule.iter().any(|sp| sp.direction == [1, 1, -1]);
+        let has_up_sw = schedule.iter().any(|sp| sp.direction == [-1, 1, 1]);
+        let has_up_se = schedule.iter().any(|sp| sp.direction == [1, 1, 1]);
+        assert!(has_up, "missing Up");
+        assert!(has_up_nw, "missing UpNorthWest");
+        assert!(has_up_ne, "missing UpNorthEast");
+        assert!(has_up_sw, "missing UpSouthWest");
+        assert!(has_up_se, "missing UpSouthEast");
     }
 
     #[test]

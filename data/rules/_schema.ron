@@ -1,0 +1,20 @@
+// Interaction Rule Schema
+//
+// Each rule defines a pairwise interaction between two adjacent materials.
+//
+//   name: String       - Human-readable label for debug display.
+//   input_a: u16       - Material ID of the first input.
+//   input_b: u16       - Material ID of the second input.
+//   output_a: u16      - Material ID that input_a transforms into.
+//   output_b: u16      - Material ID that input_b transforms into.
+//   probability: f32   - Probability per tick (0.0-1.0).
+//   temp_delta: i32    - Temperature change (quantized integer). (optional, default 0)
+//   min_temp: u32      - Minimum temperature for reaction. 0 = no min. (optional, default 0)
+//   max_temp: u32      - Maximum temperature for reaction. 0 = no max. (optional, default 0)
+//
+// Notes:
+// - Self-decay (Fire->Smoke, Smoke->Air) uses material decay_rate/decay_threshold,
+//   NOT pairwise rules.
+// - Density displacement (sand sinks in water) is handled by the movement shader.
+// - The compiler stores bidirectional entries: one for each side of the interaction.
+// - temp_delta > 0 without a material transform is rejected (C-DATA-3).

@@ -46,3 +46,35 @@ fn unpack_pressure(v: vec2<u32>) -> u32 {
 fn unpack_flags(v: vec2<u32>) -> u32 {
     return (v.y >> 26u) & 0x3Fu;
 }
+
+/// Pack all voxel fields into vec2<u32>. Must produce identical results to Rust pack_voxel.
+fn pack_voxel(
+    mat_id: u32,
+    temp: u32,
+    vx: i32,
+    vy: i32,
+    vz: i32,
+    pressure: u32,
+    flags: u32,
+) -> vec2<u32> {
+    let vx_u8 = u32(vx) & 0xFFu;
+    let vy_u8 = u32(vy) & 0xFFu;
+    let vz_u8 = u32(vz) & 0xFFu;
+    let pr = pressure & 0x3Fu;
+    let fl = flags & 0x3Fu;
+
+    let low = (mat_id & 0xFFFFu) | ((temp & 0xFFFu) << 16u) | ((vx_u8 & 0x0Fu) << 28u);
+    let high = ((vx_u8 >> 4u) & 0x0Fu) | (vy_u8 << 4u) | (vz_u8 << 12u) | (pr << 20u) | (fl << 26u);
+
+    return vec2<u32>(low, high);
+}
+
+/// Repack a voxel with new material and temperature, preserving velocity/pressure/flags.
+fn repack_material_temp(old: vec2<u32>, new_mat: u32, new_temp: u32) -> vec2<u32> {
+    let vx = unpack_vel_x(old);
+    let vy = unpack_vel_y(old);
+    let vz = unpack_vel_z(old);
+    let pressure = unpack_pressure(old);
+    let flags = unpack_flags(old);
+    return pack_voxel(new_mat, new_temp, vx, vy, vz, pressure, flags);
+}
