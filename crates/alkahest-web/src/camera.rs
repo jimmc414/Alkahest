@@ -57,7 +57,7 @@ impl Camera {
         proj * view
     }
 
-    pub fn to_uniforms(&self, width: u32, height: u32) -> CameraUniforms {
+    pub fn to_uniforms(&self, width: u32, height: u32, render_mode: u32) -> CameraUniforms {
         let w = width as f32;
         let h = height as f32;
         let vp = self.view_proj(w, h);
@@ -70,6 +70,8 @@ impl Camera {
             screen_size: [w, h],
             near: 0.1,
             fov: self.fov_y_rad,
+            render_mode,
+            _pad_rm: [0; 3],
         }
     }
 }

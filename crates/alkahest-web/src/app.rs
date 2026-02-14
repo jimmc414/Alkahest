@@ -14,7 +14,7 @@ type RafClosure = Rc<RefCell<Option<Closure<dyn FnMut(f64)>>>>;
 
 /// Material names for debug display, indexed by material ID.
 const MATERIAL_NAMES: &[&str] = &[
-    "Air", "Stone", "Sand", "Water", "Oil", "Fire", "Smoke", "Steam", "Wood", "Ash",
+    "Air", "Stone", "Sand", "Water", "Oil", "Fire", "Smoke", "Steam", "Wood", "Ash", "Ice", "Lava",
 ];
 
 /// Main application struct. Owns all subsystems.
@@ -28,6 +28,8 @@ pub struct Application {
     debug_panel: DebugPanel,
     tool_state: ToolState,
     last_frame_time: f64,
+    /// Render mode: 0 = normal, 1 = heatmap.
+    render_mode: u32,
 }
 
 impl Application {
@@ -69,6 +71,7 @@ impl Application {
             debug_panel,
             tool_state,
             last_frame_time: 0.0,
+            render_mode: 0,
         }
     }
 
@@ -184,6 +187,7 @@ impl Application {
             ui_state,
             debug_panel,
             tool_state,
+            render_mode,
             ..
         } = self;
 
@@ -220,6 +224,19 @@ impl Application {
                 log::info!("Selected material: Air (0)");
             }
 
+            // T key: toggle heatmap visualization
+            if input.was_just_pressed("t") {
+                *render_mode = if *render_mode == 0 { 1 } else { 0 };
+                log::info!(
+                    "Render mode: {}",
+                    if *render_mode == 0 {
+                        "normal"
+                    } else {
+                        "heatmap"
+                    }
+                );
+            }
+
             // Check if egui wants pointer input — if so, suppress camera controls
             if !ui_state.ctx.wants_pointer_input() {
                 if input.left_button_down {
@@ -245,13 +262,43 @@ impl Application {
                         tools::place::execute(sim, x, y, z, tool_state.place_material);
                     }
                 }
+
+                // H key: heat tool (apply to voxel at camera target)
+                if input.keys_down.contains("h") {
+                    let target = camera.target;
+                    let x = target.x as i32;
+                    let y = (target.y + 1.0) as i32;
+                    let z = target.z as i32;
+                    tools::heat::execute_heat(
+                        sim,
+                        x,
+                        y,
+                        z,
+                        alkahest_core::constants::TOOL_HEAT_DELTA,
+                    );
+                }
+
+                // F key: freeze tool (apply to voxel at camera target)
+                if input.keys_down.contains("f") {
+                    let target = camera.target;
+                    let x = target.x as i32;
+                    let y = (target.y + 1.0) as i32;
+                    let z = target.z as i32;
+                    tools::heat::execute_heat(
+                        sim,
+                        x,
+                        y,
+                        z,
+                        alkahest_core::constants::TOOL_FREEZE_DELTA,
+                    );
+                }
             }
 
             input.clear_deltas();
         }
 
         // 2. Upload camera uniforms
-        let cam_uniforms = camera.to_uniforms(width, height);
+        let cam_uniforms = camera.to_uniforms(width, height, *render_mode);
         renderer.update_camera(&gpu.queue, cam_uniforms);
 
         // Upload debug line view-projection matrix
