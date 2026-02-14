@@ -16,7 +16,22 @@ type RafClosure = Rc<RefCell<Option<Closure<dyn FnMut(f64)>>>>;
 
 /// Material names for debug display, indexed by material ID.
 const MATERIAL_NAMES: &[&str] = &[
-    "Air", "Stone", "Sand", "Water", "Oil", "Fire", "Smoke", "Steam", "Wood", "Ash", "Ice", "Lava",
+    "Air",
+    "Stone",
+    "Sand",
+    "Water",
+    "Oil",
+    "Fire",
+    "Smoke",
+    "Steam",
+    "Wood",
+    "Ash",
+    "Ice",
+    "Lava",
+    "Gunpowder",
+    "Sealed-Metal",
+    "Glass",
+    "Glass Shards",
 ];
 
 /// Main application struct. Owns all subsystems.
@@ -156,13 +171,19 @@ impl Application {
         let naturals_ron = include_str!("../../../data/materials/naturals.ron");
         let organics_ron = include_str!("../../../data/materials/organics.ron");
         let energy_ron = include_str!("../../../data/materials/energy.ron");
+        let explosives_ron = include_str!("../../../data/materials/explosives.ron");
         let combustion_ron = include_str!("../../../data/rules/combustion.ron");
+        let structural_ron = include_str!("../../../data/rules/structural.ron");
 
-        let materials =
-            alkahest_rules::loader::load_all_materials(&[naturals_ron, organics_ron, energy_ron])
-                .expect("failed to parse material RON data");
+        let materials = alkahest_rules::loader::load_all_materials(&[
+            naturals_ron,
+            organics_ron,
+            energy_ron,
+            explosives_ron,
+        ])
+        .expect("failed to parse material RON data");
 
-        let rules = alkahest_rules::loader::load_all_rules(&[combustion_ron])
+        let rules = alkahest_rules::loader::load_all_rules(&[combustion_ron, structural_ron])
             .expect("failed to parse rules RON data");
 
         // Validate
@@ -338,6 +359,24 @@ impl Application {
             if input.was_just_pressed("0") {
                 tool_state.place_material = 0;
                 log::info!("Selected material: Air (0)");
+            }
+
+            // Letter keys for M6 materials (12-15)
+            let letter_materials: &[(&str, u32)] = &[
+                ("g", 12), // Gunpowder
+                ("m", 13), // Sealed-Metal
+                ("v", 14), // Glass
+                ("b", 15), // Glass Shards
+            ];
+            for &(key, mat_id) in letter_materials {
+                if input.was_just_pressed(key) {
+                    tool_state.place_material = mat_id;
+                    log::info!(
+                        "Selected material: {} ({})",
+                        MATERIAL_NAMES.get(mat_id as usize).unwrap_or(&"Unknown"),
+                        mat_id
+                    );
+                }
             }
 
             // T key: toggle heatmap visualization
