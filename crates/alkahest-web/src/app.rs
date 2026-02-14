@@ -529,16 +529,66 @@ impl Application {
                 log::info!("Brush shape: {}", tool_state.brush.shape.name());
             }
 
+            // Tab key: toggle camera mode (orbit ↔ first-person)
+            if input.was_just_pressed("Tab") {
+                camera.toggle_mode();
+                let mode_name = match camera.mode {
+                    crate::camera::CameraMode::Orbit => "Orbit",
+                    crate::camera::CameraMode::FirstPerson => "First-Person",
+                };
+                log::info!("Camera: {}", mode_name);
+            }
+
             // Check if egui wants pointer input — if so, suppress camera controls
             if !ui_state.ctx.wants_pointer_input() {
-                if input.left_button_down {
-                    camera.orbit(input.mouse_dx, input.mouse_dy);
-                }
-                if input.middle_button_down {
-                    camera.pan(input.mouse_dx, input.mouse_dy);
-                }
-                if input.scroll_delta.abs() > 0.01 {
-                    camera.zoom(input.scroll_delta);
+                match camera.mode {
+                    crate::camera::CameraMode::Orbit => {
+                        if input.left_button_down {
+                            camera.orbit(input.mouse_dx, input.mouse_dy);
+                        }
+                        if input.middle_button_down {
+                            camera.pan(input.mouse_dx, input.mouse_dy);
+                        }
+                        if input.scroll_delta.abs() > 0.01 {
+                            camera.zoom(input.scroll_delta);
+                        }
+                    }
+                    crate::camera::CameraMode::FirstPerson => {
+                        // Mouse look (always active in FP mode)
+                        camera.fp_look(input.mouse_dx, input.mouse_dy);
+
+                        // WASD + Space/Ctrl movement
+                        let mut fwd = 0.0f32;
+                        let mut rt = 0.0f32;
+                        let mut up = 0.0f32;
+                        if input.keys_down.contains("w") {
+                            fwd += 1.0;
+                        }
+                        if input.keys_down.contains("s") {
+                            fwd -= 1.0;
+                        }
+                        if input.keys_down.contains("d") {
+                            rt += 1.0;
+                        }
+                        if input.keys_down.contains("a") {
+                            rt -= 1.0;
+                        }
+                        if input.keys_down.contains(" ") {
+                            up += 1.0;
+                        }
+                        if input.keys_down.contains("Control") {
+                            up -= 1.0;
+                        }
+
+                        if fwd != 0.0 || rt != 0.0 || up != 0.0 {
+                            let speed = 0.5;
+                            let chunk_map = world.chunk_map();
+                            camera.fp_move(fwd, rt, up, speed, |cx, cy, cz| {
+                                let coord = glam::IVec3::new(cx, cy, cz);
+                                chunk_map.get(&coord).is_some_and(|c| c.has_non_air)
+                            });
+                        }
+                    }
                 }
 
                 // Right-click: place/remove voxels with multi-chunk brush
