@@ -11,6 +11,7 @@ pub use crate::passes::commands::SimCommand;
 use crate::passes::commands::{self, SimParams, MAX_COMMANDS};
 use crate::passes::movement;
 use crate::passes::reactions;
+use crate::passes::thermal;
 
 /// GPU debug buffer size (C-GPU-10).
 const DEBUG_BUFFER_SIZE: u64 = 4096;
@@ -45,6 +46,7 @@ pub struct SimPipeline {
     command_pipeline: wgpu::ComputePipeline,
     movement_pipeline: wgpu::ComputePipeline,
     reaction_pipeline: wgpu::ComputePipeline,
+    thermal_pipeline: wgpu::ComputePipeline,
     movement_schedule: Vec<SubPass>,
     material_count: u32,
     pending_commands: Vec<SimCommand>,
@@ -179,8 +181,19 @@ impl SimPipeline {
 
         // Compose shader sources
         let constants_preamble = format!(
-            "const CHUNK_SIZE: u32 = {}u;\nconst VOXELS_PER_CHUNK: u32 = {}u;\n",
-            CHUNK_SIZE, VOXELS_PER_CHUNK,
+            "const CHUNK_SIZE: u32 = {}u;\nconst VOXELS_PER_CHUNK: u32 = {}u;\n\
+             const DIFFUSION_RATE: f32 = {:.6};\n\
+             const ENTROPY_DRAIN_RATE: u32 = {}u;\n\
+             const CONVECTION_THRESHOLD: u32 = {}u;\n\
+             const AMBIENT_TEMP_QUANTIZED: u32 = {}u;\n\
+             const TEMP_QUANT_MAX_VALUE: u32 = {}u;\n",
+            CHUNK_SIZE,
+            VOXELS_PER_CHUNK,
+            alkahest_core::constants::DIFFUSION_RATE,
+            alkahest_core::constants::ENTROPY_DRAIN_RATE,
+            alkahest_core::constants::CONVECTION_THRESHOLD,
+            alkahest_core::constants::AMBIENT_TEMP_QUANTIZED,
+            alkahest_core::constants::TEMP_QUANT_MAX_VALUE,
         );
         let types_wgsl = include_str!("../../../shaders/common/types.wgsl");
         let coords_wgsl = include_str!("../../../shaders/common/coords.wgsl");
@@ -188,6 +201,7 @@ impl SimPipeline {
         let commands_wgsl = include_str!("../../../shaders/sim/commands.wgsl");
         let movement_wgsl = include_str!("../../../shaders/sim/movement.wgsl");
         let reactions_wgsl = include_str!("../../../shaders/sim/reactions.wgsl");
+        let thermal_wgsl = include_str!("../../../shaders/sim/thermal.wgsl");
 
         let command_shader_source = format!(
             "{constants_preamble}\n{types_wgsl}\n{coords_wgsl}\n{rng_wgsl}\n{commands_wgsl}"
@@ -197,6 +211,9 @@ impl SimPipeline {
         );
         let reactions_shader_source = format!(
             "{constants_preamble}\n{types_wgsl}\n{coords_wgsl}\n{rng_wgsl}\n{reactions_wgsl}"
+        );
+        let thermal_shader_source = format!(
+            "{constants_preamble}\n{types_wgsl}\n{coords_wgsl}\n{rng_wgsl}\n{thermal_wgsl}"
         );
 
         let command_pipeline =
@@ -208,6 +225,8 @@ impl SimPipeline {
             &bind_group_layout,
             &reactions_shader_source,
         );
+        let thermal_pipeline =
+            thermal::create_thermal_pipeline(device, &bind_group_layout, &thermal_shader_source);
 
         let movement_schedule = build_movement_schedule();
 
@@ -223,6 +242,7 @@ impl SimPipeline {
             command_pipeline,
             movement_pipeline,
             reaction_pipeline,
+            thermal_pipeline,
             movement_schedule,
             material_count: rule_data.material_count,
             pending_commands: Vec::new(),
@@ -250,7 +270,7 @@ impl SimPipeline {
         }
     }
 
-    /// Run one simulation tick: Pass 1 (commands) + Pass 2 (movement) + Pass 3 (reactions).
+    /// Run one simulation tick: Pass 1 (commands) + Pass 2 (movement) + Pass 3 (reactions) + Pass 4 (thermal).
     ///
     /// Returns true if the simulation actually ticked (not paused).
     pub fn tick(
@@ -374,6 +394,28 @@ impl SimPipeline {
             reactions::dispatch_reactions(&mut pass, &self.reaction_pipeline, &bind_group);
         }
 
+        // Pass 4: Thermal diffusion (C-SIM-3: thermal after reactions)
+        {
+            // Reuses same uniform layout as reactions (tick + material_count)
+            let uniforms = ReactionUniforms {
+                tick: self.tick_count as u32,
+                material_count: self.material_count,
+                _pad0: 0,
+                _pad1: 0,
+                _pad2: 0,
+                _pad3: 0,
+                _pad4: 0,
+                _pad5: 0,
+            };
+            queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
+
+            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("sim-thermal-pass"),
+                timestamp_writes: None,
+            });
+            thermal::dispatch_thermal(&mut pass, &self.thermal_pipeline, &bind_group);
+        }
+
         // Swap buffers and advance tick
         self.double_buffer.swap();
         self.tick_count += 1;
@@ -417,7 +459,8 @@ impl SimPipeline {
         self.tick_count
     }
 
-    /// Build the M3 initial scene: stone floor, sand pyramid, wood block, water pool, fire starter.
+    /// Build the M4 initial scene: stone floor, sand pyramid, wood block, water pool,
+    /// fire starter, ice patch, lava pool.
     fn build_initial_scene() -> Vec<[u32; 2]> {
         let cs = CHUNK_SIZE as usize;
         let total = cs * cs * cs;
@@ -429,6 +472,8 @@ impl SimPipeline {
         let water = pack_voxel(MaterialId(3), 150, 0, 0, 0, 0, 0);
         let wood = pack_voxel(MaterialId(8), 150, 0, 0, 0, 0, 0);
         let fire = pack_voxel(MaterialId(5), 1536, 0, 0, 0, 0, 0); // ~3000K quantized
+        let ice = pack_voxel(MaterialId(10), 100, 0, 0, 0, 0, 0); // below ambient (~195K)
+        let lava = pack_voxel(MaterialId(11), 1024, 0, 0, 0, 0, 0); // ~2000K quantized
 
         // Stone floor at y=0
         for z in 0..cs {
@@ -477,6 +522,26 @@ impl SimPipeline {
         {
             let idx = 15 + 2 * cs + 17 * cs * cs;
             data[idx] = [fire.low, fire.high];
+        }
+
+        // Ice patch: y=1..=2 at (26-29, _, 4-7)
+        for y in 1..=2u32 {
+            for z in 4..7 {
+                for x in 26..29 {
+                    let idx = x + y as usize * cs + z * cs * cs;
+                    data[idx] = [ice.low, ice.high];
+                }
+            }
+        }
+
+        // Lava pool: y=1..=2 at (4-7, _, 26-29)
+        for y in 1..=2u32 {
+            for z in 26..29 {
+                for x in 4..7 {
+                    let idx = x + y as usize * cs + z * cs * cs;
+                    data[idx] = [lava.low, lava.high];
+                }
+            }
         }
 
         data
