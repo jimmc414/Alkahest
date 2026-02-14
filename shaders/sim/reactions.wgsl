@@ -143,7 +143,16 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         var new_temp = i32(my_temp) + temp_delta;
         new_temp = clamp(new_temp, 0, 4095);
 
-        voxel = repack_material_temp(voxel, input_a_becomes, u32(new_temp));
+        // Apply pressure_delta from rule (rule_0.y, bitcast to i32)
+        let pressure_delta = bitcast<i32>(rule_0.y);
+        var new_pressure = i32(unpack_pressure(voxel)) + pressure_delta;
+        new_pressure = clamp(new_pressure, 0, 63);
+
+        let vx = unpack_vel_x(voxel);
+        let vy = unpack_vel_y(voxel);
+        let vz = unpack_vel_z(voxel);
+        let flags = unpack_flags(voxel);
+        voxel = pack_voxel(input_a_becomes, u32(new_temp), vx, vy, vz, u32(new_pressure), flags);
         break;
     }
 
