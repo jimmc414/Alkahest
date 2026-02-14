@@ -41,3 +41,18 @@ pub const NO_RULE: u32 = 0xFFFFFFFF;
 
 /// Sentinel value in rule data: material unchanged by this rule.
 pub const MATERIAL_UNCHANGED: u32 = 0xFFFF;
+
+/// Thermal diffusion rate per tick. CFL constraint: DIFFUSION_RATE * max_conductivity * 26 < 1.0.
+pub const DIFFUSION_RATE: f32 = 0.03;
+
+/// Per-tick temperature drain toward ambient (quantized units).
+pub const ENTROPY_DRAIN_RATE: u32 = 1;
+
+/// Temperature delta above ambient that triggers convection (quantized units).
+pub const CONVECTION_THRESHOLD: u32 = 50;
+
+/// Heat tool: signed temperature delta applied per command (quantized units, ~1000K).
+pub const TOOL_HEAT_DELTA: i32 = 500;
+
+/// Freeze tool: signed temperature delta applied per command (quantized units, ~400K).
+pub const TOOL_FREEZE_DELTA: i32 = -200;

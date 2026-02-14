@@ -51,6 +51,16 @@ pub struct MaterialDef {
     /// Viscosity for lateral liquid movement (0.0 = free flow, 1.0 = no flow).
     #[serde(default)]
     pub viscosity: f32,
+    /// Thermal conductivity (0.0 = insulator, 1.0 = perfect conductor).
+    #[serde(default)]
+    pub thermal_conductivity: f32,
+    /// Temperature in Kelvin at which this material undergoes upward phase change.
+    /// 0.0 = no phase change.
+    #[serde(default)]
+    pub phase_change_temp: f32,
+    /// Material ID to transform into when temperature exceeds phase_change_temp.
+    #[serde(default)]
+    pub phase_change_product: u16,
 }
 
 /// Collection of material definitions indexed by ID.
@@ -109,6 +119,9 @@ mod tests {
                 decay_threshold: 0,
                 decay_product: 0,
                 viscosity: 0.0,
+                thermal_conductivity: 0.0,
+                phase_change_temp: 0.0,
+                phase_change_product: 0,
             }],
         };
         assert!(table.get(2).is_some());
