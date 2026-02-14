@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/alkahest-core",
+    "crates/alkahest-render",
     "crates/alkahest-web",
 ]
 
@@ -26,6 +27,9 @@ console_error_panic_hook = "=0.1.7"
 
 # Math
 glam = "=0.29.2"
+
+# Serialization / GPU data
+bytemuck = { version = "=1.21.0", features = ["derive"] }
 
 # Error handling
 thiserror = "=2.0.11"

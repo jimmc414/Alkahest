@@ -1,6 +1,9 @@
+use crate::camera::Camera;
 use crate::gpu::GpuContext;
+use crate::input::InputState;
 use crate::ui::debug::DebugPanel;
 use crate::ui::UiState;
+use alkahest_render::Renderer;
 use std::cell::RefCell;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
@@ -10,18 +13,33 @@ type RafClosure = Rc<RefCell<Option<Closure<dyn FnMut(f64)>>>>;
 /// Main application struct. Owns all subsystems.
 pub struct Application {
     gpu: GpuContext,
+    renderer: Renderer,
+    camera: Camera,
+    input_state: Rc<RefCell<InputState>>,
     ui_state: UiState,
     debug_panel: DebugPanel,
     last_frame_time: f64,
 }
 
 impl Application {
-    pub fn new(gpu: GpuContext, dpi_scale: f32) -> Self {
+    pub fn new(gpu: GpuContext, dpi_scale: f32, input_state: Rc<RefCell<InputState>>) -> Self {
         let ui_state = UiState::new(&gpu.device, gpu.surface_format, dpi_scale);
-        let debug_panel = DebugPanel::new(gpu.adapter_name.clone(), gpu.backend.clone());
+
+        let width = gpu.surface_config.width;
+        let height = gpu.surface_config.height;
+        let renderer = Renderer::new(&gpu.device, &gpu.queue, gpu.surface_format, width, height);
+
+        let voxel_count = renderer.non_air_voxel_count();
+        let debug_panel =
+            DebugPanel::new(gpu.adapter_name.clone(), gpu.backend.clone(), voxel_count);
+
+        let camera = Camera::new();
 
         Self {
             gpu,
+            renderer,
+            camera,
+            input_state,
             ui_state,
             debug_panel,
             last_frame_time: 0.0,
@@ -92,16 +110,53 @@ impl Application {
 
     /// Render a single frame.
     fn render_frame(&mut self) {
-        // Destructure self for disjoint field borrows — avoids borrow checker
-        // conflicts when renderer.render() ties its lifetime to the render pass.
+        // Destructure self for disjoint field borrows
         let Application {
             gpu,
+            renderer,
+            camera,
+            input_state,
             ui_state,
             debug_panel,
             ..
         } = self;
 
-        // Get surface texture, handle Lost by reconfiguring
+        let width = gpu.surface_config.width;
+        let height = gpu.surface_config.height;
+
+        // 1. Read input and update camera
+        {
+            let mut input = input_state.borrow_mut();
+
+            // Check if egui wants pointer input — if so, suppress camera controls
+            if !ui_state.ctx.wants_pointer_input() {
+                if input.left_button_down {
+                    camera.orbit(input.mouse_dx, input.mouse_dy);
+                }
+                if input.middle_button_down {
+                    camera.pan(input.mouse_dx, input.mouse_dy);
+                }
+                if input.scroll_delta.abs() > 0.01 {
+                    camera.zoom(input.scroll_delta);
+                }
+            }
+
+            input.clear_deltas();
+        }
+
+        // 2. Upload camera uniforms
+        let cam_uniforms = camera.to_uniforms(width, height);
+        renderer.update_camera(&gpu.queue, cam_uniforms);
+
+        // Upload debug line view-projection matrix
+        let vp = camera.view_proj(width as f32, height as f32);
+        renderer.update_debug_uniforms(&gpu.queue, vp.to_cols_array_2d());
+
+        // Update debug panel camera info
+        let eye = camera.eye_position();
+        debug_panel.set_camera_info(eye.into(), camera.target.into());
+
+        // 3. Get surface texture, handle Lost by reconfiguring
         let output = match gpu.surface.get_current_texture() {
             Ok(output) => output,
             Err(wgpu::SurfaceError::Lost) => {
@@ -118,11 +173,10 @@ impl Application {
             }
         };
 
-        let view = output.texture.create_view(&Default::default());
+        let surface_view = output.texture.create_view(&Default::default());
 
-        // Run egui frame first (no encoder needed)
-        let screen =
-            ui_state.screen_descriptor(gpu.surface_config.width, gpu.surface_config.height);
+        // 4. Run egui frame (before GPU encoding)
+        let screen = ui_state.screen_descriptor(width, height);
 
         let raw_input = egui::RawInput {
             screen_rect: Some(egui::Rect::from_min_size(
@@ -143,37 +197,17 @@ impl Application {
             .ctx
             .tessellate(full_output.shapes, full_output.pixels_per_point);
 
-        // GPU work
+        // 5. Create command encoder
         let mut encoder = gpu
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("frame-encoder"),
             });
 
-        // 1. Clear render pass (solid color background)
-        {
-            let _pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("clear-pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.05,
-                            g: 0.05,
-                            b: 0.08,
-                            a: 1.0,
-                        }),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            });
-        }
+        // 6-8. Compute ray march + blit + debug lines
+        renderer.render(&mut encoder, &surface_view, width, height);
 
-        // 2. Upload egui textures and update buffers
+        // 9. Upload egui textures and buffers
         for (id, delta) in &full_output.textures_delta.set {
             ui_state
                 .renderer
@@ -188,15 +222,15 @@ impl Application {
             &screen,
         );
 
-        // 3. egui render pass with LoadOp::Load (C-EGUI-2: after scene pass)
-        //    forget_lifetime() shifts the encoder guard from compile-time to run-time,
-        //    avoiding borrow checker conflicts between encoder and renderer lifetimes.
+        // 10. egui render pass with LoadOp::Load (C-EGUI-2: after scene)
+        //     forget_lifetime() shifts the encoder guard from compile-time to run-time,
+        //     avoiding borrow checker conflicts between encoder and renderer lifetimes.
         {
             let mut pass = encoder
                 .begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("egui-pass"),
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: &view,
+                        view: &surface_view,
                         resolve_target: None,
                         ops: wgpu::Operations {
                             load: wgpu::LoadOp::Load,
@@ -213,12 +247,12 @@ impl Application {
                 .render(&mut pass, &clipped_primitives, &screen);
         }
 
-        // 4. Free textures after rendering
+        // 11. Free textures after rendering
         for id in &full_output.textures_delta.free {
             ui_state.renderer.free_texture(id);
         }
 
-        // 5. Submit and present
+        // 12. Submit and present
         gpu.queue.submit(std::iter::once(encoder.finish()));
         output.present();
     }

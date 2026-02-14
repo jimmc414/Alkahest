@@ -1,5 +1,7 @@
 mod app;
+mod camera;
 mod gpu;
+mod input;
 pub mod ui;
 
 use std::cell::RefCell;
@@ -51,8 +53,12 @@ async fn run() -> Result<(), alkahest_core::error::AlkahestError> {
         dpi_scale
     );
 
+    // Register input listeners on canvas ONCE (C-RUST-3)
+    let input_state = Rc::new(RefCell::new(input::InputState::new()));
+    input::register_input_listeners(&canvas, input_state.clone());
+
     let gpu_ctx = gpu::init_gpu(canvas, physical_width, physical_height).await?;
-    let application = app::Application::new(gpu_ctx, dpi_scale);
+    let application = app::Application::new(gpu_ctx, dpi_scale, input_state);
     let app_rc = Rc::new(RefCell::new(application));
 
     app::Application::start_loop(app_rc);

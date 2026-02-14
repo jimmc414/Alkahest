@@ -14,4 +14,10 @@ pub enum AlkahestError {
 
     #[error("Surface texture error: {0}")]
     SurfaceTextureError(String),
+
+    #[error("Shader compilation failed: {0}")]
+    ShaderCompilationFailed(String),
+
+    #[error("Render pipeline creation failed: {0}")]
+    RenderPipelineError(String),
 }

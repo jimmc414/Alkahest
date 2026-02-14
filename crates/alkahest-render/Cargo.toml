@@ -1,0 +1,11 @@
+[package]
+name = "alkahest-render"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+alkahest-core = { path = "../alkahest-core" }
+wgpu = { workspace = true }
+glam = { workspace = true }
+bytemuck = { workspace = true }
+log = { workspace = true }
