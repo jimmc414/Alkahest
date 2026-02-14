@@ -12,11 +12,13 @@ pub enum ActiveTool {
     #[default]
     Place,
     Remove,
+    #[allow(dead_code)]
     Heat,
     Push,
 }
 
 impl ActiveTool {
+    #[allow(dead_code)]
     pub fn name(self) -> &'static str {
         match self {
             ActiveTool::Place => "Place",

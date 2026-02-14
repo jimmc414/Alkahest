@@ -4,6 +4,7 @@ use alkahest_sim::pipeline::SimPipeline;
 /// `x, y, z` are local coordinates within the chunk (0..CHUNK_SIZE).
 /// `brush_radius`: 0 = single voxel, 1–16 for area brushes.
 /// `brush_shape`: 0 = single, 1 = cube, 2 = sphere.
+#[allow(clippy::too_many_arguments)]
 pub fn place_voxel(
     sim: &mut SimPipeline,
     x: i32,
@@ -52,6 +53,7 @@ pub fn remove_voxel(
 }
 
 /// Encode a heat command and enqueue it.
+#[allow(clippy::too_many_arguments)]
 pub fn heat_voxel(
     sim: &mut SimPipeline,
     x: i32,
@@ -77,6 +79,7 @@ pub fn heat_voxel(
 
 /// Encode a push command and enqueue it.
 /// Direction is packed as 3 biased-128 i8 values: dx | (dy << 8) | (dz << 16).
+#[allow(clippy::too_many_arguments)]
 pub fn push_voxel(
     sim: &mut SimPipeline,
     x: i32,

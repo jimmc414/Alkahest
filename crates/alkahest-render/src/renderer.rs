@@ -757,6 +757,7 @@ impl Renderer {
         (texture, view)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn create_scene_bind_group(
         device: &wgpu::Device,
         layout: &wgpu::BindGroupLayout,

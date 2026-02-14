@@ -57,6 +57,7 @@ impl Camera {
         proj * view
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn to_uniforms(
         &self,
         width: u32,

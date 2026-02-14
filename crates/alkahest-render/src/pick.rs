@@ -1,7 +1,7 @@
-/// GPU pick buffer for voxel hover info via async readback.
-/// Stores 8 u32 values written by the ray march shader for the cursor pixel:
-///   [0] world_x, [1] world_y, [2] world_z, [3] material_id,
-///   [4] temperature, [5] pressure, [6] velocity_packed, [7] flags
+//! GPU pick buffer for voxel hover info via async readback.
+//! Stores 8 u32 values written by the ray march shader for the cursor pixel:
+//!   [0] world_x, [1] world_y, [2] world_z, [3] material_id,
+//!   [4] temperature, [5] pressure, [6] velocity_packed, [7] flags
 
 /// Size of the pick buffer in bytes (8 × u32 = 32 bytes).
 pub const PICK_BUFFER_SIZE: u64 = 8 * 4;
@@ -62,7 +62,13 @@ impl PickBuffer {
         if self.pending {
             return;
         }
-        encoder.copy_buffer_to_buffer(&self.pick_buffer, 0, &self.staging_buffer, 0, PICK_BUFFER_SIZE);
+        encoder.copy_buffer_to_buffer(
+            &self.pick_buffer,
+            0,
+            &self.staging_buffer,
+            0,
+            PICK_BUFFER_SIZE,
+        );
         self.pending = true;
     }
 

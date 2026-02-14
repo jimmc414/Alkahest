@@ -60,6 +60,8 @@ pub struct Application {
     tick_accumulator: f64,
     /// Latest pick result from GPU readback.
     pick_result: alkahest_render::PickResult,
+    /// Frame delta in milliseconds (set by start_loop before render_frame).
+    frame_delta_ms: f64,
 }
 
 impl Application {
@@ -156,6 +158,7 @@ impl Application {
             sim_speed: 1.0,
             tick_accumulator: 0.0,
             pick_result: alkahest_render::PickResult::default(),
+            frame_delta_ms: 16.67,
         }
     }
 
@@ -256,6 +259,7 @@ impl Application {
             }
 
             app_ref.last_frame_time = timestamp;
+            app_ref.frame_delta_ms = delta;
             app_ref.debug_panel.update(delta);
             app_ref.render_frame();
 
@@ -382,6 +386,7 @@ impl Application {
             sim_speed,
             tick_accumulator,
             pick_result,
+            frame_delta_ms,
             ..
         } = self;
 
@@ -393,6 +398,11 @@ impl Application {
 
         if let Some(flags) = sim.poll_readback(&gpu.device, dispatch_list.len() as u32) {
             world.process_activity(&flags);
+        }
+
+        // Poll pick buffer readback (1–2 frame latency)
+        if let Some(result) = renderer.pick.poll_readback(&gpu.device) {
+            *pick_result = result;
         }
 
         // Rebuild dispatch list after activity processing
@@ -462,6 +472,59 @@ impl Application {
                 );
             }
 
+            // Simulation speed: [ to decrease, ] to increase (0.25x – 4.0x)
+            if input.was_just_pressed("[") {
+                *sim_speed = (*sim_speed - 0.25).max(0.25);
+                log::info!("Sim speed: {:.2}x", *sim_speed);
+            }
+            if input.was_just_pressed("]") {
+                *sim_speed = (*sim_speed + 0.25).min(4.0);
+                log::info!("Sim speed: {:.2}x", *sim_speed);
+            }
+
+            // X key: cycle cross-section clip axis (off → X → Y → Z → off)
+            if input.was_just_pressed("x") {
+                *clip_axis = (*clip_axis + 1) % 4;
+                let axis_name = match *clip_axis {
+                    1 => "X",
+                    2 => "Y",
+                    3 => "Z",
+                    _ => "Off",
+                };
+                log::info!("Cross-section: {}", axis_name);
+            }
+
+            // Tool selection: p = Place, e = Remove, j = Push
+            // (h/f remain as held-key tools for heat/freeze)
+            if input.was_just_pressed("p") {
+                tool_state.active = tools::ActiveTool::Place;
+                log::info!("Tool: Place");
+            }
+            if input.was_just_pressed("e") {
+                tool_state.active = tools::ActiveTool::Remove;
+                log::info!("Tool: Remove");
+            }
+            if input.was_just_pressed("j") {
+                tool_state.active = tools::ActiveTool::Push;
+                log::info!("Tool: Push");
+            }
+
+            // Brush radius: - to decrease, = to increase (0 – 16)
+            if input.was_just_pressed("-") {
+                tool_state.brush.decrease_radius();
+                log::info!("Brush radius: {}", tool_state.brush.radius);
+            }
+            if input.was_just_pressed("=") {
+                tool_state.brush.increase_radius();
+                log::info!("Brush radius: {}", tool_state.brush.radius);
+            }
+
+            // Brush shape: Shift+[ to cycle shape
+            if input.shift_down && input.was_just_pressed("{") {
+                tool_state.brush.shape = tool_state.brush.shape.next();
+                log::info!("Brush shape: {}", tool_state.brush.shape.name());
+            }
+
             // Check if egui wants pointer input — if so, suppress camera controls
             if !ui_state.ctx.wants_pointer_input() {
                 if input.left_button_down {
@@ -489,7 +552,14 @@ impl Application {
                             tools::remove::execute(sim, lx, ly, lz, cdi, br, bs);
                         } else {
                             tools::place::execute(
-                                sim, lx, ly, lz, tool_state.place_material, cdi, br, bs,
+                                sim,
+                                lx,
+                                ly,
+                                lz,
+                                tool_state.place_material,
+                                cdi,
+                                br,
+                                bs,
                             );
                         }
                     }
@@ -557,7 +627,13 @@ impl Application {
             input.mouse_y as u32
         };
         let cam_uniforms = camera.to_uniforms(
-            width, height, *render_mode, *clip_axis, *clip_position, cursor_x, cursor_y,
+            width,
+            height,
+            *render_mode,
+            *clip_axis,
+            *clip_position,
+            cursor_x,
+            cursor_y,
         );
         renderer.update_camera(&gpu.queue, cam_uniforms);
 
@@ -620,16 +696,31 @@ impl Application {
                 label: Some("frame-encoder"),
             });
 
-        // 7. Upload chunk descriptors and sim commands, dispatch simulation tick
-        sim.upload_chunk_descriptors(&gpu.queue, &descriptor_data);
-        sim.upload_commands(&gpu.queue);
-        sim.tick(
-            &gpu.device,
-            &gpu.queue,
-            &mut encoder,
-            active_chunk_count,
-            &active_slots,
-        );
+        // 7. Upload chunk descriptors and sim commands, dispatch simulation ticks
+        //    Tick accumulator: sim_speed controls how many ticks per second.
+        //    At 60fps: 0.25x → ~15 ticks/sec, 1x → ~60, 4x → ~240.
+        //    Cap at 4 ticks per frame to prevent frame-time explosion.
+        let delta_sec = *frame_delta_ms / 1000.0;
+        *tick_accumulator += delta_sec * (*sim_speed as f64) * 60.0;
+        let mut ticks_this_frame = 0u32;
+        while *tick_accumulator >= 1.0 && ticks_this_frame < 4 {
+            sim.upload_chunk_descriptors(&gpu.queue, &descriptor_data);
+            sim.upload_commands(&gpu.queue);
+            sim.tick(
+                &gpu.device,
+                &gpu.queue,
+                &mut encoder,
+                active_chunk_count,
+                &active_slots,
+            );
+            *tick_accumulator -= 1.0;
+            ticks_this_frame += 1;
+        }
+        // Ensure at least descriptor upload even if no ticks ran
+        if ticks_this_frame == 0 {
+            sim.upload_chunk_descriptors(&gpu.queue, &descriptor_data);
+            sim.upload_commands(&gpu.queue);
+        }
 
         // 8. Bind the sim's read pool to the renderer (update bind group)
         // We do this every frame because the read buffer alternates after each tick.
@@ -647,6 +738,9 @@ impl Application {
 
         // 9. Compute ray march + blit + debug lines
         renderer.render(&mut encoder, &surface_view, width, height);
+
+        // 9b. Request pick buffer readback (results available next frame)
+        renderer.pick.request_readback(&mut encoder);
 
         // 10. Upload egui textures and buffers
         for (id, delta) in &full_output.textures_delta.set {
