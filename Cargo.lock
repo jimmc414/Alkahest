@@ -50,11 +50,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "alkahest-sim"
+version = "0.1.0"
+dependencies = [
+ "alkahest-core",
+ "bytemuck",
+ "glam",
+ "log",
+ "wgpu",
+]
+
+[[package]]
 name = "alkahest-web"
 version = "0.1.0"
 dependencies = [
  "alkahest-core",
  "alkahest-render",
+ "alkahest-sim",
  "bytemuck",
  "console_error_panic_hook",
  "console_log",

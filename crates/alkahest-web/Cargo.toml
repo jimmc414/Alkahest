@@ -9,6 +9,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 alkahest-core = { path = "../alkahest-core" }
 alkahest-render = { path = "../alkahest-render" }
+alkahest-sim = { path = "../alkahest-sim" }
 wgpu = { workspace = true }
 glam = { workspace = true }
 bytemuck = { workspace = true }
