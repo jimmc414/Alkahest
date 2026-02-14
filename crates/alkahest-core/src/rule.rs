@@ -31,6 +31,10 @@ pub struct InteractionRule {
     /// Maximum temperature (quantized) for the reaction to occur. 0 = no maximum.
     #[serde(default)]
     pub max_temp: u32,
+    /// Pressure delta applied when this reaction fires (signed).
+    /// Positive = pressure increase (explosions), negative = pressure decrease.
+    #[serde(default)]
+    pub pressure_delta: i32,
 }
 
 /// Collection of interaction rules.
@@ -68,6 +72,7 @@ mod tests {
                 temp_delta: 200,
                 min_temp: 0,
                 max_temp: 0,
+                pressure_delta: 0,
             }],
         };
         assert_eq!(set.len(), 1);

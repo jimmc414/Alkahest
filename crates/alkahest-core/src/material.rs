@@ -61,6 +61,10 @@ pub struct MaterialDef {
     /// Material ID to transform into when temperature exceeds phase_change_temp.
     #[serde(default)]
     pub phase_change_product: u16,
+    /// Structural integrity (0.0–63.0). Pressure exceeding this causes rupture.
+    /// 0.0 = no structural role (powders, gases). Higher = stronger containment.
+    #[serde(default)]
+    pub structural_integrity: f32,
 }
 
 /// Collection of material definitions indexed by ID.
@@ -122,6 +126,7 @@ mod tests {
                 thermal_conductivity: 0.0,
                 phase_change_temp: 0.0,
                 phase_change_product: 0,
+                structural_integrity: 0.0,
             }],
         };
         assert!(table.get(2).is_some());

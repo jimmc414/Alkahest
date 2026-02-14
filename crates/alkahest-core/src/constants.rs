@@ -82,3 +82,17 @@ pub const CHUNK_DESC_STRIDE: u32 = 32;
 
 /// Stride in u32s per chunk activity flags entry.
 pub const ACTIVITY_FLAGS_STRIDE: u32 = 1;
+
+// ── M6: Pressure and Structural Integrity Constants ─────────────────
+
+/// Pressure diffusion rate per tick. Controls how fast pressure equalizes.
+pub const PRESSURE_DIFFUSION_RATE: f32 = 0.15;
+
+/// Maximum pressure value (6-bit field, 0–63).
+pub const MAX_PRESSURE: u32 = 63;
+
+/// Pressure gain per tick for enclosed gas/liquid above ambient temperature.
+pub const THERMAL_PRESSURE_FACTOR: u32 = 1;
+
+/// Maximum BFS radius for structural collapse detection (CPU-side).
+pub const STRUCTURAL_BFS_RADIUS: u32 = 32;
