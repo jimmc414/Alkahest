@@ -64,6 +64,8 @@ pub struct Application {
     frame_delta_ms: f64,
     /// Material browser UI state.
     browser_state: crate::ui::browser::BrowserState,
+    /// Whether the help overlay is open.
+    help_open: bool,
 }
 
 impl Application {
@@ -162,6 +164,7 @@ impl Application {
             pick_result: alkahest_render::PickResult::default(),
             frame_delta_ms: 16.67,
             browser_state: crate::ui::browser::BrowserState::new(),
+            help_open: false,
         }
     }
 
@@ -391,6 +394,7 @@ impl Application {
             pick_result,
             frame_delta_ms,
             browser_state,
+            help_open,
             ..
         } = self;
 
@@ -539,6 +543,11 @@ impl Application {
                 log::info!("Camera: {}", mode_name);
             }
 
+            // ? or F1: toggle help overlay
+            if input.was_just_pressed("?") || input.was_just_pressed("F1") {
+                *help_open = !*help_open;
+            }
+
             // Check if egui wants pointer input — if so, suppress camera controls
             if !ui_state.ctx.wants_pointer_input() {
                 match camera.mode {
@@ -671,6 +680,29 @@ impl Application {
             input.clear_deltas();
         }
 
+        // 2b. Generate brush preview wireframe
+        {
+            use alkahest_render::debug_lines;
+            let target = camera.target;
+            let center = [target.x, target.y + 1.0, target.z];
+            let r = tool_state.brush.radius;
+            let verts = if r == 0 {
+                // Single voxel: 1x1x1 cube outline
+                debug_lines::cube_wireframe(center, 0.0)
+            } else {
+                match tool_state.brush.shape {
+                    crate::tools::brush::BrushShape::Cube
+                    | crate::tools::brush::BrushShape::Single => {
+                        debug_lines::cube_wireframe(center, r as f32)
+                    }
+                    crate::tools::brush::BrushShape::Sphere => {
+                        debug_lines::sphere_wireframe(center, r as f32)
+                    }
+                }
+            };
+            renderer.update_debug_lines(&gpu.queue, &verts);
+        }
+
         // 3. Upload camera uniforms
         let cursor_x = {
             let input = input_state.borrow();
@@ -746,6 +778,7 @@ impl Application {
             crate::ui::hud::show(ctx, tool_state, MATERIAL_NAMES, *sim_speed, sim.is_paused());
             crate::ui::hover::show(ctx, pick_result, MATERIAL_NAMES);
             crate::ui::settings::show(ctx, clip_axis, clip_position, sim_speed, render_mode);
+            crate::ui::help::show(ctx, help_open);
         });
 
         let clipped_primitives = ui_state

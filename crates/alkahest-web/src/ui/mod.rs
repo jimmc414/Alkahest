@@ -1,5 +1,6 @@
 pub mod browser;
 pub mod debug;
+pub mod help;
 pub mod hover;
 pub mod hud;
 pub mod settings;
