@@ -83,6 +83,7 @@ dependencies = [
  "alkahest-render",
  "alkahest-rules",
  "alkahest-sim",
+ "alkahest-world",
  "bytemuck",
  "console_error_panic_hook",
  "console_log",
@@ -95,6 +96,15 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "wgpu",
+]
+
+[[package]]
+name = "alkahest-world"
+version = "0.1.0"
+dependencies = [
+ "alkahest-core",
+ "glam",
+ "log",
 ]
 
 [[package]]

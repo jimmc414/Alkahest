@@ -1,0 +1,9 @@
+[package]
+name = "alkahest-world"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+alkahest-core = { path = "../alkahest-core" }
+glam = { workspace = true }
+log = { workspace = true }

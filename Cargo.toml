@@ -6,6 +6,7 @@ members = [
     "crates/alkahest-rules",
     "crates/alkahest-sim",
     "crates/alkahest-web",
+    "crates/alkahest-world",
 ]
 
 [workspace.dependencies]
