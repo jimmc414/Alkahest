@@ -1,4 +1,5 @@
 pub mod pipeline;
+pub mod structural;
 
 mod buffers;
 mod conflict;
