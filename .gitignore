@@ -78,18 +78,5 @@ build/
 out/
 target/
 
-# Python
-__pycache__/
-__pypackages__/
-.ipynb_checkpoints
-*$py.class
-celerybeat-schedule
-develop-eggs/
-dmypy.json
-eggs/
-ipython_config.py
-local_settings.py
-pip-delete-this-directory.txt
-pip-log.txt
-pip-wheel-metadata/
-venv
+# Rust / WASM
+web/pkg/
