@@ -1,4 +1,4 @@
-/// Debug panel displaying adapter info, frame timing, voxel count, and camera info
+/// Debug panel displaying adapter info, frame timing, simulation state, and camera info
 /// (C-PERF-5: pre-allocated strings).
 pub struct DebugPanel {
     adapter_name: String,
@@ -6,22 +6,24 @@ pub struct DebugPanel {
     frame_times: [f64; 60],
     frame_index: usize,
     avg_frame_time_ms: f64,
-    voxel_count: u32,
     camera_pos: [f32; 3],
     camera_target: [f32; 3],
+    sim_tick: u64,
+    sim_paused: bool,
 }
 
 impl DebugPanel {
-    pub fn new(adapter_name: String, backend: String, voxel_count: u32) -> Self {
+    pub fn new(adapter_name: String, backend: String) -> Self {
         Self {
             adapter_name,
             backend,
             frame_times: [0.0; 60],
             frame_index: 0,
             avg_frame_time_ms: 0.0,
-            voxel_count,
             camera_pos: [0.0; 3],
             camera_target: [0.0; 3],
+            sim_tick: 0,
+            sim_paused: false,
         }
     }
 
@@ -37,6 +39,12 @@ impl DebugPanel {
     pub fn set_camera_info(&mut self, pos: [f32; 3], target: [f32; 3]) {
         self.camera_pos = pos;
         self.camera_target = target;
+    }
+
+    /// Update simulation tick count and pause state.
+    pub fn set_sim_info(&mut self, tick: u64, paused: bool) {
+        self.sim_tick = tick;
+        self.sim_paused = paused;
     }
 
     /// Render the debug panel using egui.
@@ -56,7 +64,9 @@ impl DebugPanel {
                 ui.label(format!("{:.2} ms", self.avg_frame_time_ms));
                 ui.label(format!("{:.0} FPS", fps));
                 ui.separator();
-                ui.label(format!("Voxels: {}", self.voxel_count));
+                let state_str = if self.sim_paused { "PAUSED" } else { "RUNNING" };
+                ui.label(format!("Sim: {} | Tick: {}", state_str, self.sim_tick));
+                ui.separator();
                 ui.label(format!(
                     "Cam: ({:.1}, {:.1}, {:.1})",
                     self.camera_pos[0], self.camera_pos[1], self.camera_pos[2]

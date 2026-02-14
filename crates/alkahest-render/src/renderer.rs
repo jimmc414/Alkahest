@@ -135,12 +135,12 @@ impl Renderer {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        // -- Voxel buffer (static for M1) --
-        let voxel_data = Self::build_test_scene();
-        let voxel_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("voxel-buffer"),
-            contents: bytemuck::cast_slice(&voxel_data),
-            usage: wgpu::BufferUsages::STORAGE,
+        // -- Voxel buffer placeholder (will be replaced by sim pipeline's buffer) --
+        let voxel_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("voxel-buffer-placeholder"),
+            size: (VOXELS_PER_CHUNK as u64) * 8,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
         });
 
         // -- Material color buffer --
@@ -595,23 +595,15 @@ impl Renderer {
         }
     }
 
-    /// Count non-air voxels in the test scene (for debug panel).
-    pub fn non_air_voxel_count(&self) -> u32 {
-        // We know the scene layout, compute at init.
-        // Stone floor: 32*32 = 1024
-        // Pyramid layers 1-8
-        let mut count = 1024u32;
-        for layer in 1u32..=8 {
-            let half = CHUNK_SIZE / 2;
-            let min_coord = half as i32 - (9 - layer) as i32;
-            let max_coord = half as i32 + (9 - layer) as i32;
-            if max_coord > min_coord {
-                let side = (max_coord - min_coord) as u32;
-                count += side * side;
-            }
-        }
-        count += 1; // emissive voxel
-        count
+    /// Rebind the scene bind group to use an external voxel buffer (from the sim pipeline).
+    pub fn update_voxel_buffer(&mut self, device: &wgpu::Device, voxel_buffer: &wgpu::Buffer) {
+        self.scene_bind_group = Self::create_scene_bind_group(
+            device,
+            &self.scene_bgl,
+            voxel_buffer,
+            &self.material_color_buffer,
+            &self.render_texture_view,
+        );
     }
 
     // -- Private helpers --
@@ -664,53 +656,6 @@ impl Renderer {
                 },
             ],
         })
-    }
-
-    /// Build the M1 test scene: stone floor + sand pyramid + emissive voxel.
-    fn build_test_scene() -> Vec<[u32; 2]> {
-        use alkahest_core::math::pack_voxel;
-        use alkahest_core::types::MaterialId;
-
-        let cs = CHUNK_SIZE as usize;
-        let total = cs * cs * cs;
-        let air = pack_voxel(MaterialId(0), 0, 0, 0, 0, 0, 0);
-        let mut data = vec![[air.low, air.high]; total];
-
-        let stone = pack_voxel(MaterialId(1), 150, 0, 0, 0, 0, 0);
-        let sand = pack_voxel(MaterialId(2), 150, 0, 0, 0, 0, 0);
-        let emissive = pack_voxel(MaterialId(3), 150, 0, 0, 0, 0, 0);
-
-        // Stone floor at y=0
-        for z in 0..cs {
-            for x in 0..cs {
-                let idx = x + z * cs * cs; // y=0, so y*cs term is zero
-                data[idx] = [stone.low, stone.high];
-            }
-        }
-
-        // Sand pyramid: y=1..=8, centered at chunk center
-        let half = cs / 2;
-        for layer in 1u32..=8 {
-            let radius = (9 - layer) as i32;
-            let min_c = half as i32 - radius;
-            let max_c = half as i32 + radius;
-            for z in min_c..max_c {
-                for x in min_c..max_c {
-                    if x >= 0 && x < cs as i32 && z >= 0 && z < cs as i32 {
-                        let idx = x as usize + layer as usize * cs + z as usize * cs * cs;
-                        data[idx] = [sand.low, sand.high];
-                    }
-                }
-            }
-        }
-
-        // Emissive voxel at (28, 20, 28)
-        {
-            let idx = 28 + 20 * cs + 28 * cs * cs;
-            data[idx] = [emissive.low, emissive.high];
-        }
-
-        data
     }
 
     /// Build the material color table (C-DESIGN-1: no hardcoded materials in shaders).

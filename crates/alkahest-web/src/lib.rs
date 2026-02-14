@@ -1,7 +1,9 @@
 mod app;
 mod camera;
+mod commands;
 mod gpu;
 mod input;
+mod tools;
 pub mod ui;
 
 use std::cell::RefCell;

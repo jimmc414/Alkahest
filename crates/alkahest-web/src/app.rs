@@ -1,9 +1,11 @@
 use crate::camera::Camera;
 use crate::gpu::GpuContext;
 use crate::input::InputState;
+use crate::tools::{self, ToolState};
 use crate::ui::debug::DebugPanel;
 use crate::ui::UiState;
 use alkahest_render::Renderer;
+use alkahest_sim::pipeline::SimPipeline;
 use std::cell::RefCell;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
@@ -14,10 +16,12 @@ type RafClosure = Rc<RefCell<Option<Closure<dyn FnMut(f64)>>>>;
 pub struct Application {
     gpu: GpuContext,
     renderer: Renderer,
+    sim: SimPipeline,
     camera: Camera,
     input_state: Rc<RefCell<InputState>>,
     ui_state: UiState,
     debug_panel: DebugPanel,
+    tool_state: ToolState,
     last_frame_time: f64,
 }
 
@@ -29,19 +33,21 @@ impl Application {
         let height = gpu.surface_config.height;
         let renderer = Renderer::new(&gpu.device, &gpu.queue, gpu.surface_format, width, height);
 
-        let voxel_count = renderer.non_air_voxel_count();
-        let debug_panel =
-            DebugPanel::new(gpu.adapter_name.clone(), gpu.backend.clone(), voxel_count);
+        let sim = SimPipeline::new(&gpu.device, &gpu.queue);
 
+        let debug_panel = DebugPanel::new(gpu.adapter_name.clone(), gpu.backend.clone());
+        let tool_state = ToolState::new();
         let camera = Camera::new();
 
         Self {
             gpu,
             renderer,
+            sim,
             camera,
             input_state,
             ui_state,
             debug_panel,
+            tool_state,
             last_frame_time: 0.0,
         }
     }
@@ -114,19 +120,29 @@ impl Application {
         let Application {
             gpu,
             renderer,
+            sim,
             camera,
             input_state,
             ui_state,
             debug_panel,
+            tool_state,
             ..
         } = self;
 
         let width = gpu.surface_config.width;
         let height = gpu.surface_config.height;
 
-        // 1. Read input and update camera
+        // 1. Read input and update camera + handle sim controls
         {
             let mut input = input_state.borrow_mut();
+
+            // Simulation controls
+            if input.was_just_pressed(" ") {
+                sim.toggle_pause();
+            }
+            if input.was_just_pressed(".") {
+                sim.single_step();
+            }
 
             // Check if egui wants pointer input — if so, suppress camera controls
             if !ui_state.ctx.wants_pointer_input() {
@@ -138,6 +154,20 @@ impl Application {
                 }
                 if input.scroll_delta.abs() > 0.01 {
                     camera.zoom(input.scroll_delta);
+                }
+
+                // Right-click: place/remove voxels
+                // Simple fixed-position placement for M2 (no raycasting yet)
+                if input.right_button_down {
+                    let target = camera.target;
+                    let x = target.x as i32;
+                    let y = (target.y + 1.0) as i32;
+                    let z = target.z as i32;
+                    if input.shift_down {
+                        tools::remove::execute(sim, x, y, z);
+                    } else {
+                        tools::place::execute(sim, x, y, z, tool_state.place_material);
+                    }
                 }
             }
 
@@ -155,6 +185,9 @@ impl Application {
         // Update debug panel camera info
         let eye = camera.eye_position();
         debug_panel.set_camera_info(eye.into(), camera.target.into());
+
+        // Update debug panel sim info
+        debug_panel.set_sim_info(sim.tick_count(), sim.is_paused());
 
         // 3. Get surface texture, handle Lost by reconfiguring
         let output = match gpu.surface.get_current_texture() {
@@ -204,7 +237,15 @@ impl Application {
                 label: Some("frame-encoder"),
             });
 
-        // 6-8. Compute ray march + blit + debug lines
+        // 6. Upload sim commands and dispatch simulation tick
+        sim.upload_commands(&gpu.queue);
+        sim.tick(&gpu.device, &gpu.queue, &mut encoder);
+
+        // 7. Bind the sim's read buffer to the renderer (update bind group)
+        // We do this every frame because the read buffer alternates after each tick.
+        renderer.update_voxel_buffer(&gpu.device, sim.get_read_buffer());
+
+        // 8. Compute ray march + blit + debug lines
         renderer.render(&mut encoder, &surface_view, width, height);
 
         // 9. Upload egui textures and buffers
