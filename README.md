@@ -2,17 +2,17 @@
 
 **A 3D voxel sandbox where everything reacts.**
 
-Build a stone furnace. Fill it with ore and fuel. Seal it shut. Watch pressure build until the walls crack — or the metal melts first, depending on what you built the walls from.
+Build a stone furnace. Fill it with ore and fuel. Seal it shut. Watch pressure build until the walls crack or the metal melts first, depending on what you built the walls from.
 
 Pour water down a mountainside and watch it carve channels through sand, pool in cavities, and flash to steam when it hits the lava below. Set fire to a wooden bridge and watch the supports weaken, buckle, and collapse under the weight of the stone they were holding.
 
-Alkahest simulates over 500 materials in a fully destructible 3D world — not with scripted animations, but with real physics running on every voxel. Heat conducts. Pressure accumulates. Structures bear load. Chemistry cascades. Every material has properties. Every interaction has consequences. Every experiment teaches you something new.
+Alkahest simulates over 500 materials in a fully destructible 3D world, not with scripted animations, but with real physics running on every voxel. Heat conducts. Pressure accumulates. Structures bear load. Chemistry cascades. Every material has properties. Every interaction has consequences. Every experiment teaches you something new.
 
-There are no quests. No objectives. No tutorials that hold your hand. There's a world made of matter, and the matter follows rules, and the rules compose in ways nobody — including us — has fully explored.
+There are no quests. No objectives. No tutorials that hold your hand. There's a world made of matter, and the matter follows rules, and the rules compose in ways nobody has fully explored.
 
 What happens when you pour acid into a pressurized glass chamber full of gunpowder?
 
-We don't know either. That's the point.
+Who knows? That's the point.
 
 ---
 
