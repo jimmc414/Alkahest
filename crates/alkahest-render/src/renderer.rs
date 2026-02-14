@@ -2,6 +2,7 @@ use alkahest_core::constants::*;
 use wgpu::util::DeviceExt;
 
 use crate::debug_lines::DebugVertex;
+use crate::pick::PickBuffer;
 
 /// Maximum number of debug line vertices the buffer can hold.
 const MAX_DEBUG_VERTICES: u64 = 1024;
@@ -17,7 +18,12 @@ pub struct CameraUniforms {
     pub fov: f32,
     /// Render mode: 0 = normal, 1 = heatmap.
     pub render_mode: u32,
-    pub _pad_rm: [u32; 3],
+    /// Cross-section clip axis: 0 = off, 1 = X, 2 = Y, 3 = Z.
+    pub clip_axis: u32,
+    /// Cross-section clip position (bitcast from f32).
+    pub clip_position: u32,
+    /// Packed cursor pixel: cursor_x | (cursor_y << 16).
+    pub cursor_packed: u32,
 }
 
 /// GPU-uploadable light uniforms. Must match LightUniforms in ray_march.wgsl.
@@ -78,6 +84,8 @@ pub struct Renderer {
     material_color_buffer: wgpu::Buffer,
     chunk_map_buffer: wgpu::Buffer,
     octree_buffer: wgpu::Buffer,
+    // Pick
+    pub pick: PickBuffer,
 }
 
 impl Renderer {
@@ -273,6 +281,17 @@ impl Renderer {
                     },
                     count: None,
                 },
+                // binding 5: pick_result (storage, read_write)
+                wgpu::BindGroupLayoutEntry {
+                    binding: 5,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: false },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
             ],
         });
 
@@ -292,6 +311,8 @@ impl Renderer {
             ],
         });
 
+        let pick = PickBuffer::new(device);
+
         let scene_bind_group = Self::create_scene_bind_group(
             device,
             &scene_bgl,
@@ -300,6 +321,7 @@ impl Renderer {
             &render_texture_view,
             &chunk_map_buffer,
             &octree_buffer,
+            &pick.pick_buffer,
         );
 
         // -- Compute pipeline --
@@ -519,6 +541,7 @@ impl Renderer {
             material_color_buffer,
             chunk_map_buffer,
             octree_buffer,
+            pick,
         }
     }
 
@@ -537,6 +560,7 @@ impl Renderer {
             &self.render_texture_view,
             &self.chunk_map_buffer,
             &self.octree_buffer,
+            &self.pick.pick_buffer,
         );
 
         // Recreate blit bind group (references the texture view for sampling)
@@ -670,6 +694,7 @@ impl Renderer {
             &self.render_texture_view,
             &self.chunk_map_buffer,
             &self.octree_buffer,
+            &self.pick.pick_buffer,
         );
     }
 
@@ -703,6 +728,7 @@ impl Renderer {
             &self.render_texture_view,
             &self.chunk_map_buffer,
             &self.octree_buffer,
+            &self.pick.pick_buffer,
         );
     }
 
@@ -739,6 +765,7 @@ impl Renderer {
         texture_view: &wgpu::TextureView,
         chunk_map_buffer: &wgpu::Buffer,
         octree_buffer: &wgpu::Buffer,
+        pick_buffer: &wgpu::Buffer,
     ) -> wgpu::BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("scene-bg"),
@@ -763,6 +790,10 @@ impl Renderer {
                 wgpu::BindGroupEntry {
                     binding: 4,
                     resource: octree_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 5,
+                    resource: pick_buffer.as_entire_binding(),
                 },
             ],
         })

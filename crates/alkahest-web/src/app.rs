@@ -50,6 +50,16 @@ pub struct Application {
     render_mode: u32,
     /// Octree for empty-space skipping in ray march.
     octree: alkahest_render::octree::Octree,
+    /// Cross-section clip axis: 0 = off, 1 = X, 2 = Y, 3 = Z.
+    clip_axis: u32,
+    /// Cross-section clip position in world-space.
+    clip_position: f32,
+    /// Simulation speed multiplier (0.25 – 4.0).
+    sim_speed: f32,
+    /// Fractional tick accumulator for variable-rate simulation.
+    tick_accumulator: f64,
+    /// Latest pick result from GPU readback.
+    pick_result: alkahest_render::PickResult,
 }
 
 impl Application {
@@ -141,6 +151,11 @@ impl Application {
             last_frame_time: 0.0,
             render_mode: 0,
             octree,
+            clip_axis: 0,
+            clip_position: 64.0, // middle of world Y
+            sim_speed: 1.0,
+            tick_accumulator: 0.0,
+            pick_result: alkahest_render::PickResult::default(),
         }
     }
 
@@ -362,6 +377,11 @@ impl Application {
             tool_state,
             render_mode,
             octree,
+            clip_axis,
+            clip_position,
+            sim_speed,
+            tick_accumulator,
+            pick_result,
             ..
         } = self;
 
@@ -528,7 +548,17 @@ impl Application {
         }
 
         // 3. Upload camera uniforms
-        let cam_uniforms = camera.to_uniforms(width, height, *render_mode);
+        let cursor_x = {
+            let input = input_state.borrow();
+            input.mouse_x as u32
+        };
+        let cursor_y = {
+            let input = input_state.borrow();
+            input.mouse_y as u32
+        };
+        let cam_uniforms = camera.to_uniforms(
+            width, height, *render_mode, *clip_axis, *clip_position, cursor_x, cursor_y,
+        );
         renderer.update_camera(&gpu.queue, cam_uniforms);
 
         // Upload debug line view-projection matrix

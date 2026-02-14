@@ -21,9 +21,9 @@ struct CameraUniforms {
     near: f32,
     fov: f32,
     render_mode: u32,
-    _pad_rm0: u32,
-    _pad_rm1: u32,
-    _pad_rm2: u32,
+    clip_axis: u32,
+    clip_position: u32,
+    cursor_packed: u32,
 }
 
 struct LightUniforms {
@@ -47,6 +47,7 @@ struct MaterialColor {
 @group(1) @binding(2) var output_texture: texture_storage_2d<rgba8unorm, write>;
 @group(1) @binding(3) var<storage, read> chunk_map: array<u32>;
 @group(1) @binding(4) var<storage, read> octree_nodes: array<vec2<u32>>;
+@group(1) @binding(5) var<storage, read_write> pick_result: array<u32>;
 
 const SKY_COLOR = vec4<f32>(0.05, 0.05, 0.08, 1.0);
 const MAX_RAY_STEPS: u32 = 512u;
@@ -166,6 +167,43 @@ fn heatmap_color(temp: u32) -> vec3<f32> {
         let f = (t - 0.75) / 0.25;
         return mix(vec3<f32>(1.0, 1.0, 0.0), vec3<f32>(1.0, 0.0, 0.0), f);
     }
+}
+
+// ─── Clip plane helper ────────────────────────────────────────────────
+
+/// Check if a world-space voxel position should be clipped by the cross-section plane.
+/// clip_axis: 0=off, 1=X, 2=Y, 3=Z. Clips voxels on the positive side of the plane.
+fn is_clipped(world_pos: vec3<i32>, clip_axis: u32, clip_pos: f32) -> bool {
+    if clip_axis == 0u {
+        return false;
+    }
+    let p = clip_pos;
+    if clip_axis == 1u {
+        return f32(world_pos.x) >= p;
+    } else if clip_axis == 2u {
+        return f32(world_pos.y) >= p;
+    } else {
+        return f32(world_pos.z) >= p;
+    }
+}
+
+/// Write voxel data to the pick buffer for hover info display.
+fn write_pick(world_pos: vec3<i32>, voxel: vec2<u32>) {
+    pick_result[0] = u32(world_pos.x);
+    pick_result[1] = u32(world_pos.y);
+    pick_result[2] = u32(world_pos.z);
+    pick_result[3] = unpack_material_id(voxel);
+    pick_result[4] = unpack_temperature(voxel);
+    pick_result[5] = unpack_pressure(voxel);
+    // Pack velocity as 3 biased-128 u8s
+    let vx = unpack_vel_x(voxel);
+    let vy = unpack_vel_y(voxel);
+    let vz = unpack_vel_z(voxel);
+    let vx_u8 = u32(vx + 128) & 0xFFu;
+    let vy_u8 = u32(vy + 128) & 0xFFu;
+    let vz_u8 = u32(vz + 128) & 0xFFu;
+    pick_result[6] = vx_u8 | (vy_u8 << 8u) | (vz_u8 << 16u);
+    pick_result[7] = unpack_flags(voxel);
 }
 
 // ─── Inverse direction helper ──────────────────────────────────────────
@@ -507,14 +545,46 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let ray_origin = camera.position.xyz;
     let ray_dir = normalize(far_world - near_world);
 
+    let clip_pos = bitcast<f32>(camera.clip_position);
     let hit = ray_march(ray_origin, ray_dir);
 
+    // Check if this is the cursor pixel — for pick buffer write
+    let cursor_x = camera.cursor_packed & 0xFFFFu;
+    let cursor_y = camera.cursor_packed >> 16u;
+    let is_cursor_pixel = (u32(pixel.x) == cursor_x) && (u32(pixel.y) == cursor_y);
+
     if hit.mat_id < 0 {
+        // Clear pick on miss
+        if is_cursor_pixel {
+            pick_result[3] = 0u; // material_id = 0 means no hit
+        }
+        textureStore(output_texture, vec2<u32>(global_id.xy), SKY_COLOR);
+        return;
+    }
+
+    // Check clip plane — if hit voxel is clipped, draw sky
+    if is_clipped(hit.hit_voxel, camera.clip_axis, clip_pos) {
+        if is_cursor_pixel {
+            pick_result[3] = 0u;
+        }
         textureStore(output_texture, vec2<u32>(global_id.xy), SKY_COLOR);
         return;
     }
 
     let mat_id = u32(hit.mat_id);
+
+    // Write pick data for cursor pixel
+    if is_cursor_pixel {
+        // Read full voxel data at hit position
+        let cc = world_to_chunk(hit.hit_voxel);
+        let slot_offset = chunk_map[chunk_map_index(cc)];
+        if slot_offset != 0xFFFFFFFFu {
+            let local = world_to_local(hit.hit_voxel);
+            let vi = voxel_index(local);
+            let voxel = voxel_pool[(slot_offset / 8u) + vi];
+            write_pick(hit.hit_voxel, voxel);
+        }
+    }
 
     // Reconstruct face normal from DDA axis and step sign
     var normal = vec3<f32>(0.0, 0.0, 0.0);
