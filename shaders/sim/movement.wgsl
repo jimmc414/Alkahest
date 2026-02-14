@@ -7,7 +7,7 @@
 // Buffers:
 //   @group(0) @binding(0) read_buf    — storage, read (previous tick state)
 //   @group(0) @binding(1) write_buf   — storage, read_write (next tick state)
-//   @group(0) @binding(2) materials   — storage, read (material properties, 2x vec4<f32> per material)
+//   @group(0) @binding(2) materials   — storage, read (material properties, 3x vec4<f32> per material)
 //   @group(0) @binding(3) cmd_buf     — storage, read (unused in this pass, shared layout)
 //   @group(0) @binding(4) move_params — uniform (direction, parity, tick)
 //
@@ -26,9 +26,10 @@ const PHASE_LIQUID: u32 = 1u;
 const PHASE_SOLID: u32 = 2u;
 const PHASE_POWDER: u32 = 3u;
 
-// Material properties layout: 2x vec4<f32> per material
-// props_0 = materials[mat_id * 2u]:     (density, phase, flammability, ignition_temp_quantized)
-// props_1 = materials[mat_id * 2u + 1u]: (decay_rate, decay_threshold, decay_product_id, viscosity)
+// Material properties layout: 3x vec4<f32> per material
+// props_0 = materials[mat_id * 3u]:     (density, phase, flammability, ignition_temp_quantized)
+// props_1 = materials[mat_id * 3u + 1u]: (decay_rate, decay_threshold, decay_product_id, viscosity)
+// props_2 = materials[mat_id * 3u + 2u]: (thermal_conductivity, phase_change_temp_q, phase_change_product, _pad)
 
 struct MovementParams {
     dir_x: i32,
@@ -84,7 +85,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     // Look up source material properties (density-driven movement, C-DESIGN-1)
     // 2x vec4<f32> layout: props_0 at [mat_id * 2], props_1 at [mat_id * 2 + 1]
-    let src_props_0 = materials[src_mat_id * 2u];
+    let src_props_0 = materials[src_mat_id * 3u];
     let src_density = src_props_0.x;
     let src_phase = u32(src_props_0.y);
 
@@ -106,7 +107,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
             return;
         }
         // Viscosity-based probabilistic skip for lateral movement
-        let src_props_1 = materials[src_mat_id * 2u + 1u];
+        let src_props_1 = materials[src_mat_id * 3u + 1u];
         let viscosity = src_props_1.w;
         if viscosity > 0.0 {
             let h = sim_hash(pos.x, pos.y, pos.z, move_params.tick);
@@ -147,7 +148,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     }
 
     // Density-driven displacement: if destination is lighter, swap
-    let dst_props_0 = materials[dst_mat_id * 2u];
+    let dst_props_0 = materials[dst_mat_id * 3u];
     let dst_density = dst_props_0.x;
     let dst_phase = u32(dst_props_0.y);
 
