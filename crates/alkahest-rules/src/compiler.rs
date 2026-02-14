@@ -33,7 +33,7 @@ pub struct GpuRuleData {
 /// ```text
 /// vec4<f32>[0]: density, phase, flammability, ignition_temp_quantized
 /// vec4<f32>[1]: decay_rate, decay_threshold, decay_product_id, viscosity
-/// vec4<f32>[2]: thermal_conductivity, phase_change_temp_quantized, phase_change_product_id, _pad
+/// vec4<f32>[2]: thermal_conductivity, phase_change_temp_quantized, phase_change_product_id, structural_integrity
 /// ```
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -49,20 +49,20 @@ struct GpuMaterialProps {
     thermal_conductivity: f32,
     phase_change_temp_quantized: f32,
     phase_change_product_id: f32,
-    _pad: f32,
+    structural_integrity: f32,
 }
 
 /// GPU rule data layout: 2x vec4<u32> = 32 bytes per rule entry.
 ///
 /// ```text
-/// vec4<u32>[0]: input_a_becomes, _unused, _unused, probability_u32
+/// vec4<u32>[0]: input_a_becomes, pressure_delta (bitcast i32), _unused, probability_u32
 /// vec4<u32>[1]: temp_delta_i32, _unused, min_temp, max_temp
 /// ```
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct GpuRuleEntry {
     input_a_becomes: u32,
-    _unused0: u32,
+    pressure_delta: i32,
     _unused1: u32,
     probability_u32: u32,
     temp_delta: i32,
@@ -89,7 +89,7 @@ pub fn compile(device: &wgpu::Device, materials: &MaterialTable, rules: &RuleSet
             thermal_conductivity: 0.0,
             phase_change_temp_quantized: 0.0,
             phase_change_product_id: 0.0,
-            _pad: 0.0,
+            structural_integrity: 0.0,
         };
         material_count as usize
     ];
@@ -109,7 +109,7 @@ pub fn compile(device: &wgpu::Device, materials: &MaterialTable, rules: &RuleSet
                 thermal_conductivity: mat.thermal_conductivity,
                 phase_change_temp_quantized: temp_to_quantized(mat.phase_change_temp) as f32,
                 phase_change_product_id: mat.phase_change_product as f32,
-                _pad: 0.0,
+                structural_integrity: mat.structural_integrity,
             };
         }
     }
@@ -141,7 +141,7 @@ pub fn compile(device: &wgpu::Device, materials: &MaterialTable, rules: &RuleSet
         let entry_a_idx = rule_entries.len() as u32;
         rule_entries.push(GpuRuleEntry {
             input_a_becomes: rule.output_a as u32,
-            _unused0: 0,
+            pressure_delta: rule.pressure_delta,
             _unused1: 0,
             probability_u32,
             temp_delta: rule.temp_delta,
@@ -155,7 +155,7 @@ pub fn compile(device: &wgpu::Device, materials: &MaterialTable, rules: &RuleSet
         let entry_b_idx = rule_entries.len() as u32;
         rule_entries.push(GpuRuleEntry {
             input_a_becomes: rule.output_b as u32,
-            _unused0: 0,
+            pressure_delta: rule.pressure_delta,
             _unused1: 0,
             probability_u32,
             temp_delta: rule.temp_delta,
@@ -179,7 +179,7 @@ pub fn compile(device: &wgpu::Device, materials: &MaterialTable, rules: &RuleSet
     if rule_entries.is_empty() {
         rule_entries.push(GpuRuleEntry {
             input_a_becomes: 0,
-            _unused0: 0,
+            pressure_delta: 0,
             _unused1: 0,
             probability_u32: 0,
             temp_delta: 0,

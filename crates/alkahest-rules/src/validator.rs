@@ -194,6 +194,7 @@ mod tests {
             thermal_conductivity: 0.0,
             phase_change_temp: 0.0,
             phase_change_product: 0,
+            structural_integrity: 0.0,
         }
     }
 
@@ -265,6 +266,7 @@ mod tests {
                 temp_delta: 0,
                 min_temp: 0,
                 max_temp: 0,
+                pressure_delta: 0,
             }],
         };
         let result = validate_rules(&rules, &table);
@@ -289,6 +291,7 @@ mod tests {
                 temp_delta: 100, // positive delta with no transform = energy from nothing
                 min_temp: 0,
                 max_temp: 0,
+                pressure_delta: 0,
             }],
         };
         let result = validate_rules(&rules, &table);
@@ -321,6 +324,7 @@ mod tests {
                     temp_delta: 0,
                     min_temp: 0,
                     max_temp: 0,
+                    pressure_delta: 0,
                 },
                 InteractionRule {
                     name: "BtoA".into(),
@@ -332,6 +336,7 @@ mod tests {
                     temp_delta: 0,
                     min_temp: 0,
                     max_temp: 0,
+                    pressure_delta: 0,
                 },
             ],
         };
