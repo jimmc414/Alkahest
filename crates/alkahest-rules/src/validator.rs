@@ -1,4 +1,4 @@
-use alkahest_core::constants::TEMP_QUANT_MAX_VALUE;
+use alkahest_core::constants::{DIFFUSION_RATE, TEMP_QUANT_MAX_VALUE};
 use alkahest_core::material::MaterialTable;
 use alkahest_core::rule::RuleSet;
 use std::collections::HashSet;
@@ -12,6 +12,14 @@ pub enum ValidationError {
     IgnitionTempExceedsMax { name: String, value: f32, max: f32 },
     #[error("Material '{name}' decay_threshold {value} exceeds quantization max {max} (C-DATA-4)")]
     DecayThresholdExceedsMax { name: String, value: u32, max: u16 },
+    #[error("Material '{name}' thermal_conductivity {value} out of range [0.0, 1.0] (C-DATA-4)")]
+    ThermalConductivityOutOfRange { name: String, value: f32 },
+    #[error("CFL stability violated: DIFFUSION_RATE({rate}) * max_conductivity({conductivity}) * 26 = {product} >= 1.0")]
+    CflStabilityViolation {
+        rate: f32,
+        conductivity: f32,
+        product: f32,
+    },
     #[error("Rule '{name}' references unknown material ID {id}")]
     UnknownMaterialRef { name: String, id: u16 },
     #[error(
@@ -50,6 +58,28 @@ pub fn validate_materials(table: &MaterialTable) -> Result<(), Vec<ValidationErr
                 max: TEMP_QUANT_MAX_VALUE,
             });
         }
+
+        if mat.thermal_conductivity < 0.0 || mat.thermal_conductivity > 1.0 {
+            errors.push(ValidationError::ThermalConductivityOutOfRange {
+                name: mat.name.clone(),
+                value: mat.thermal_conductivity,
+            });
+        }
+    }
+
+    // CFL stability check: DIFFUSION_RATE * max_conductivity * 26 < 1.0
+    let max_conductivity = table
+        .materials
+        .iter()
+        .map(|m| m.thermal_conductivity)
+        .fold(0.0f32, f32::max);
+    let cfl_product = DIFFUSION_RATE * max_conductivity * 26.0;
+    if cfl_product >= 1.0 {
+        errors.push(ValidationError::CflStabilityViolation {
+            rate: DIFFUSION_RATE,
+            conductivity: max_conductivity,
+            product: cfl_product,
+        });
     }
 
     if errors.is_empty() {
@@ -161,10 +191,13 @@ mod tests {
             decay_threshold: 0,
             decay_product: 0,
             viscosity: 0.0,
+            thermal_conductivity: 0.0,
+            phase_change_temp: 0.0,
+            phase_change_product: 0,
         }
     }
 
-    fn ten_materials() -> MaterialTable {
+    fn twelve_materials() -> MaterialTable {
         MaterialTable {
             materials: vec![
                 make_material(0, "Air"),
@@ -177,19 +210,21 @@ mod tests {
                 make_material(7, "Steam"),
                 make_material(8, "Wood"),
                 make_material(9, "Ash"),
+                make_material(10, "Ice"),
+                make_material(11, "Lava"),
             ],
         }
     }
 
     #[test]
     fn test_valid_materials_load() {
-        let table = ten_materials();
+        let table = twelve_materials();
         assert!(validate_materials(&table).is_ok());
     }
 
     #[test]
     fn test_duplicate_material_id_rejected() {
-        let mut table = ten_materials();
+        let mut table = twelve_materials();
         table.materials.push(make_material(2, "DuplicateSand"));
         let result = validate_materials(&table);
         assert!(result.is_err());
@@ -218,7 +253,7 @@ mod tests {
 
     #[test]
     fn test_nonexistent_material_ref_rejected() {
-        let table = ten_materials();
+        let table = twelve_materials();
         let rules = RuleSet {
             rules: vec![InteractionRule {
                 name: "BadRef".into(),
@@ -242,7 +277,7 @@ mod tests {
 
     #[test]
     fn test_energy_from_nothing_rejected() {
-        let table = ten_materials();
+        let table = twelve_materials();
         let rules = RuleSet {
             rules: vec![InteractionRule {
                 name: "FreeEnergy".into(),
@@ -306,5 +341,52 @@ mod tests {
         assert!(errors
             .iter()
             .any(|e| matches!(e, ValidationError::InfiniteLoop { .. })));
+    }
+
+    #[test]
+    fn test_cfl_stability_validated() {
+        // Conductivity of 1.5 would violate CFL: 0.03 * 1.5 * 26 = 1.17 >= 1.0
+        let table = MaterialTable {
+            materials: vec![{
+                let mut m = make_material(0, "SuperConductor");
+                m.thermal_conductivity = 1.5;
+                m
+            }],
+        };
+        let result = validate_materials(&table);
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors
+            .iter()
+            .any(|e| matches!(e, ValidationError::ThermalConductivityOutOfRange { .. })));
+    }
+
+    #[test]
+    fn test_thermal_conductivity_range() {
+        // Negative conductivity rejected
+        let table = MaterialTable {
+            materials: vec![{
+                let mut m = make_material(0, "NegConductor");
+                m.thermal_conductivity = -0.1;
+                m
+            }],
+        };
+        let result = validate_materials(&table);
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors
+            .iter()
+            .any(|e| matches!(e, ValidationError::ThermalConductivityOutOfRange { .. })));
+
+        // Conductivity > 1.0 rejected
+        let table = MaterialTable {
+            materials: vec![{
+                let mut m = make_material(0, "OverConductor");
+                m.thermal_conductivity = 1.1;
+                m
+            }],
+        };
+        let result = validate_materials(&table);
+        assert!(result.is_err());
     }
 }

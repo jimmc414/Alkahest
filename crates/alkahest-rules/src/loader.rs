@@ -110,12 +110,12 @@ mod tests {
 
     #[test]
     fn test_valid_materials_load() {
-        // Load all 10 materials from embedded RON data
+        // Load all 12 materials from embedded RON data
         let naturals = include_str!("../../../data/materials/naturals.ron");
         let organics = include_str!("../../../data/materials/organics.ron");
         let energy = include_str!("../../../data/materials/energy.ron");
         let table = load_all_materials(&[naturals, organics, energy]).expect("should load");
-        assert_eq!(table.len(), 10);
+        assert_eq!(table.len(), 12);
     }
 
     #[test]
