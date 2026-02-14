@@ -43,12 +43,18 @@ pub struct BrushState {
     pub radius: u32,
 }
 
-impl BrushState {
-    pub fn new() -> Self {
+impl Default for BrushState {
+    fn default() -> Self {
         Self {
             shape: BrushShape::Single,
             radius: 0,
         }
+    }
+}
+
+impl BrushState {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Increase radius by 1, clamped to 16.

@@ -38,12 +38,18 @@ pub struct ToolState {
     pub brush: BrushState,
 }
 
-impl ToolState {
-    pub fn new() -> Self {
+impl Default for ToolState {
+    fn default() -> Self {
         Self {
             active: ActiveTool::default(),
             place_material: 2, // sand
             brush: BrushState::new(),
         }
+    }
+}
+
+impl ToolState {
+    pub fn new() -> Self {
+        Self::default()
     }
 }

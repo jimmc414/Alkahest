@@ -62,6 +62,8 @@ pub struct Application {
     pick_result: alkahest_render::PickResult,
     /// Frame delta in milliseconds (set by start_loop before render_frame).
     frame_delta_ms: f64,
+    /// Material browser UI state.
+    browser_state: crate::ui::browser::BrowserState,
 }
 
 impl Application {
@@ -159,6 +161,7 @@ impl Application {
             tick_accumulator: 0.0,
             pick_result: alkahest_render::PickResult::default(),
             frame_delta_ms: 16.67,
+            browser_state: crate::ui::browser::BrowserState::new(),
         }
     }
 
@@ -387,6 +390,7 @@ impl Application {
             tick_accumulator,
             pick_result,
             frame_delta_ms,
+            browser_state,
             ..
         } = self;
 
@@ -683,6 +687,15 @@ impl Application {
 
         let full_output = ui_state.ctx.run(raw_input, |ctx| {
             debug_panel.show(ctx);
+            crate::ui::toolbar::show(ctx, tool_state);
+            if let Some(mat_id) =
+                crate::ui::browser::show(ctx, browser_state, tool_state.place_material)
+            {
+                tool_state.place_material = mat_id;
+            }
+            crate::ui::hud::show(ctx, tool_state, MATERIAL_NAMES, *sim_speed, sim.is_paused());
+            crate::ui::hover::show(ctx, pick_result, MATERIAL_NAMES);
+            crate::ui::settings::show(ctx, clip_axis, clip_position, sim_speed, render_mode);
         });
 
         let clipped_primitives = ui_state

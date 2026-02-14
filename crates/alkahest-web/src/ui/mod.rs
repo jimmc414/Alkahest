@@ -1,4 +1,9 @@
+pub mod browser;
 pub mod debug;
+pub mod hover;
+pub mod hud;
+pub mod settings;
+pub mod toolbar;
 
 use egui_wgpu::ScreenDescriptor;
 
