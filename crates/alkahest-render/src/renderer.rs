@@ -1,4 +1,4 @@
-use alkahest_core::constants::{CHUNK_SIZE, VOXELS_PER_CHUNK};
+use alkahest_core::constants::*;
 use wgpu::util::DeviceExt;
 
 use crate::debug_lines::DebugVertex;
@@ -74,8 +74,10 @@ pub struct Renderer {
     #[allow(dead_code)] // Kept for future dynamic light updates
     light_uniform_buffer: wgpu::Buffer,
     // Scene
-    voxel_buffer: wgpu::Buffer,
+    voxel_pool_buffer: wgpu::Buffer,
     material_color_buffer: wgpu::Buffer,
+    chunk_map_buffer: wgpu::Buffer,
+    octree_buffer: wgpu::Buffer,
 }
 
 impl Renderer {
@@ -90,8 +92,18 @@ impl Renderer {
         // -- Shader source composition --
         // Inject constants (C-DESIGN-3: single source of truth from Rust)
         let constants_preamble = format!(
-            "const CHUNK_SIZE: u32 = {}u;\nconst VOXELS_PER_CHUNK: u32 = {}u;\n",
-            CHUNK_SIZE, VOXELS_PER_CHUNK,
+            "const CHUNK_SIZE: u32 = {}u;\nconst VOXELS_PER_CHUNK: u32 = {}u;\n\
+             const WORLD_CHUNKS_X: u32 = {}u;\nconst WORLD_CHUNKS_Y: u32 = {}u;\n\
+             const WORLD_CHUNKS_Z: u32 = {}u;\n\
+             const SENTINEL_NEIGHBOR: u32 = {}u;\n\
+             const CHUNK_DESC_STRIDE: u32 = {}u;\n",
+            CHUNK_SIZE,
+            VOXELS_PER_CHUNK,
+            WORLD_CHUNKS_X,
+            WORLD_CHUNKS_Y,
+            WORLD_CHUNKS_Z,
+            SENTINEL_NEIGHBOR,
+            CHUNK_DESC_STRIDE,
         );
 
         let types_wgsl = include_str!("../../../shaders/common/types.wgsl");
@@ -138,10 +150,28 @@ impl Renderer {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        // -- Voxel buffer placeholder (will be replaced by sim pipeline's buffer) --
-        let voxel_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("voxel-buffer-placeholder"),
+        // -- Voxel pool buffer placeholder (will be replaced by sim pipeline's pool buffer) --
+        let voxel_pool_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("voxel-pool-placeholder"),
             size: (VOXELS_PER_CHUNK as u64) * 8,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        // -- Chunk map buffer: WORLD_CHUNKS_X * WORLD_CHUNKS_Y * WORLD_CHUNKS_Z u32 entries --
+        // Each entry is a pool_slot_byte_offset (0xFFFFFFFF for unloaded).
+        let chunk_map_size = (WORLD_CHUNKS_X * WORLD_CHUNKS_Y * WORLD_CHUNKS_Z * 4) as u64;
+        let chunk_map_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("chunk-map"),
+            size: chunk_map_size,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        // -- Octree buffer placeholder (will be filled later) --
+        let octree_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("octree-nodes"),
+            size: 1024 * 8, // 8192 bytes initial placeholder
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -188,6 +218,7 @@ impl Renderer {
         let scene_bgl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("scene-bgl"),
             entries: &[
+                // binding 0: voxel_pool (storage, read)
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
                     visibility: wgpu::ShaderStages::COMPUTE,
@@ -198,6 +229,7 @@ impl Renderer {
                     },
                     count: None,
                 },
+                // binding 1: material_colors (storage, read)
                 wgpu::BindGroupLayoutEntry {
                     binding: 1,
                     visibility: wgpu::ShaderStages::COMPUTE,
@@ -208,6 +240,7 @@ impl Renderer {
                     },
                     count: None,
                 },
+                // binding 2: output_texture (storage texture, write, rgba8unorm)
                 wgpu::BindGroupLayoutEntry {
                     binding: 2,
                     visibility: wgpu::ShaderStages::COMPUTE,
@@ -215,6 +248,28 @@ impl Renderer {
                         access: wgpu::StorageTextureAccess::WriteOnly,
                         format: wgpu::TextureFormat::Rgba8Unorm,
                         view_dimension: wgpu::TextureViewDimension::D2,
+                    },
+                    count: None,
+                },
+                // binding 3: chunk_map (storage, read)
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                // binding 4: octree_nodes (storage, read)
+                wgpu::BindGroupLayoutEntry {
+                    binding: 4,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
                     },
                     count: None,
                 },
@@ -240,9 +295,11 @@ impl Renderer {
         let scene_bind_group = Self::create_scene_bind_group(
             device,
             &scene_bgl,
-            &voxel_buffer,
+            &voxel_pool_buffer,
             &material_color_buffer,
             &render_texture_view,
+            &chunk_map_buffer,
+            &octree_buffer,
         );
 
         // -- Compute pipeline --
@@ -458,8 +515,10 @@ impl Renderer {
             debug_uniform_buffer,
             camera_uniform_buffer,
             light_uniform_buffer,
-            voxel_buffer,
+            voxel_pool_buffer,
             material_color_buffer,
+            chunk_map_buffer,
+            octree_buffer,
         }
     }
 
@@ -473,9 +532,11 @@ impl Renderer {
         self.scene_bind_group = Self::create_scene_bind_group(
             device,
             &self.scene_bgl,
-            &self.voxel_buffer,
+            &self.voxel_pool_buffer,
             &self.material_color_buffer,
             &self.render_texture_view,
+            &self.chunk_map_buffer,
+            &self.octree_buffer,
         );
 
         // Recreate blit bind group (references the texture view for sampling)
@@ -598,15 +659,32 @@ impl Renderer {
         }
     }
 
-    /// Rebind the scene bind group to use an external voxel buffer (from the sim pipeline).
-    pub fn update_voxel_buffer(&mut self, device: &wgpu::Device, voxel_buffer: &wgpu::Buffer) {
+    /// Rebind the scene bind group to use an external voxel pool buffer (from the sim pipeline).
+    /// Called each frame (or when the pool buffer changes) to point at the sim's read pool.
+    pub fn update_voxel_pool(&mut self, device: &wgpu::Device, voxel_pool_buffer: &wgpu::Buffer) {
         self.scene_bind_group = Self::create_scene_bind_group(
             device,
             &self.scene_bgl,
-            voxel_buffer,
+            voxel_pool_buffer,
             &self.material_color_buffer,
             &self.render_texture_view,
+            &self.chunk_map_buffer,
+            &self.octree_buffer,
         );
+    }
+
+    /// Upload chunk map entries to the GPU.
+    pub fn update_chunk_map(&self, queue: &wgpu::Queue, chunk_map_data: &[u32]) {
+        queue.write_buffer(
+            &self.chunk_map_buffer,
+            0,
+            bytemuck::cast_slice(chunk_map_data),
+        );
+    }
+
+    /// Upload octree node data to the GPU.
+    pub fn update_octree(&self, queue: &wgpu::Queue, octree_data: &[u32]) {
+        queue.write_buffer(&self.octree_buffer, 0, bytemuck::cast_slice(octree_data));
     }
 
     /// Update material colors from compiled rule data. Called once at init (C-PERF-2).
@@ -620,9 +698,11 @@ impl Renderer {
         self.scene_bind_group = Self::create_scene_bind_group(
             device,
             &self.scene_bgl,
-            &self.voxel_buffer,
+            &self.voxel_pool_buffer,
             &self.material_color_buffer,
             &self.render_texture_view,
+            &self.chunk_map_buffer,
+            &self.octree_buffer,
         );
     }
 
@@ -654,9 +734,11 @@ impl Renderer {
     fn create_scene_bind_group(
         device: &wgpu::Device,
         layout: &wgpu::BindGroupLayout,
-        voxel_buffer: &wgpu::Buffer,
+        voxel_pool_buffer: &wgpu::Buffer,
         material_color_buffer: &wgpu::Buffer,
         texture_view: &wgpu::TextureView,
+        chunk_map_buffer: &wgpu::Buffer,
+        octree_buffer: &wgpu::Buffer,
     ) -> wgpu::BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("scene-bg"),
@@ -664,7 +746,7 @@ impl Renderer {
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: voxel_buffer.as_entire_binding(),
+                    resource: voxel_pool_buffer.as_entire_binding(),
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
@@ -673,6 +755,14 @@ impl Renderer {
                 wgpu::BindGroupEntry {
                     binding: 2,
                     resource: wgpu::BindingResource::TextureView(texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: chunk_map_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: octree_buffer.as_entire_binding(),
                 },
             ],
         })

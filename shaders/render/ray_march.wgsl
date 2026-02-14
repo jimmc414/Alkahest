@@ -1,9 +1,16 @@
-// ray_march.wgsl — Compute shader for DDA ray marching through a voxel chunk.
-// Reads: voxel_buffer (storage), material_colors (storage), camera + light uniforms.
+// ray_march.wgsl — Compute shader for two-level DDA ray marching through a multi-chunk voxel world.
+// Reads: voxel_pool (storage), material_colors (storage), chunk_map (storage),
+//         octree_nodes (storage, reserved), camera + light uniforms.
 // Writes: output_texture (storage texture, rgba8unorm).
 // Workgroup size: 8x8x1 — 64 threads per workgroup, one thread per pixel.
+//
+// World dimensions: WORLD_CHUNKS_X * CHUNK_SIZE x WORLD_CHUNKS_Y * CHUNK_SIZE x WORLD_CHUNKS_Z * CHUNK_SIZE
+//                   = 256 x 128 x 256 voxels across an 8x4x8 chunk grid.
+//
+// Outer DDA: steps through chunk-sized cells (8x4x8 grid).
+// Inner DDA: steps through 32^3 voxels within a non-empty chunk.
 
-// -- Injected constants: CHUNK_SIZE, VOXELS_PER_CHUNK --
+// -- Injected constants: CHUNK_SIZE, VOXELS_PER_CHUNK, WORLD_CHUNKS_X, WORLD_CHUNKS_Y, WORLD_CHUNKS_Z, SENTINEL_NEIGHBOR --
 // -- Injected: shaders/common/types.wgsl --
 // -- Injected: shaders/common/coords.wgsl --
 
@@ -30,18 +37,105 @@ struct MaterialColor {
     emission: f32,
 }
 
+// Group 0: uniforms (unchanged)
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 @group(0) @binding(1) var<uniform> light: LightUniforms;
 
-@group(1) @binding(0) var<storage, read> voxel_buffer: array<vec2<u32>>;
+// Group 1: scene data (multi-chunk layout)
+@group(1) @binding(0) var<storage, read> voxel_pool: array<vec2<u32>>;
 @group(1) @binding(1) var<storage, read> material_colors: array<MaterialColor>;
 @group(1) @binding(2) var output_texture: texture_storage_2d<rgba8unorm, write>;
+@group(1) @binding(3) var<storage, read> chunk_map: array<u32>;
+@group(1) @binding(4) var<storage, read> octree_nodes: array<vec2<u32>>;
 
 const SKY_COLOR = vec4<f32>(0.05, 0.05, 0.08, 1.0);
-const MAX_RAY_STEPS: u32 = 128u;
-const MAX_SHADOW_STEPS: u32 = 64u;
+const MAX_RAY_STEPS: u32 = 512u;
+const MAX_SHADOW_STEPS: u32 = 256u;
 
-// AABB ray intersection. Returns (t_near, t_far). If t_near > t_far, no hit.
+// World dimensions in voxels (derived from chunk grid and chunk size)
+const WORLD_VOXELS_X: u32 = WORLD_CHUNKS_X * CHUNK_SIZE;
+const WORLD_VOXELS_Y: u32 = WORLD_CHUNKS_Y * CHUNK_SIZE;
+const WORLD_VOXELS_Z: u32 = WORLD_CHUNKS_Z * CHUNK_SIZE;
+
+// ─── Coordinate helpers ────────────────────────────────────────────────
+
+/// Convert world-space voxel position to chunk coordinate.
+fn world_to_chunk(world_pos: vec3<i32>) -> vec3<i32> {
+    return vec3<i32>(
+        world_pos.x / i32(CHUNK_SIZE),
+        world_pos.y / i32(CHUNK_SIZE),
+        world_pos.z / i32(CHUNK_SIZE),
+    );
+}
+
+/// Convert world-space voxel position to local position within its chunk [0, CHUNK_SIZE).
+fn world_to_local(world_pos: vec3<i32>) -> vec3<i32> {
+    let cs = i32(CHUNK_SIZE);
+    return vec3<i32>(
+        ((world_pos.x % cs) + cs) % cs,
+        ((world_pos.y % cs) + cs) % cs,
+        ((world_pos.z % cs) + cs) % cs,
+    );
+}
+
+/// Linear index into the chunk_map array from a chunk coordinate.
+fn chunk_map_index(chunk_coord: vec3<i32>) -> u32 {
+    return u32(chunk_coord.z) * WORLD_CHUNKS_X * WORLD_CHUNKS_Y
+         + u32(chunk_coord.y) * WORLD_CHUNKS_X
+         + u32(chunk_coord.x);
+}
+
+/// Check if a world-space voxel position is within world bounds.
+fn in_world_bounds(world_pos: vec3<i32>) -> bool {
+    return world_pos.x >= 0 && world_pos.x < i32(WORLD_VOXELS_X)
+        && world_pos.y >= 0 && world_pos.y < i32(WORLD_VOXELS_Y)
+        && world_pos.z >= 0 && world_pos.z < i32(WORLD_VOXELS_Z);
+}
+
+/// Check if a chunk coordinate is within the chunk grid bounds.
+fn in_chunk_grid(cc: vec3<i32>) -> bool {
+    return cc.x >= 0 && cc.x < i32(WORLD_CHUNKS_X)
+        && cc.y >= 0 && cc.y < i32(WORLD_CHUNKS_Y)
+        && cc.z >= 0 && cc.z < i32(WORLD_CHUNKS_Z);
+}
+
+// ─── Voxel sampling (world-space) ──────────────────────────────────────
+
+/// Sample material ID at a world-space voxel position. Returns 0 (air) for out-of-bounds
+/// or unloaded chunks.
+fn sample_voxel_world(world_pos: vec3<i32>) -> u32 {
+    if !in_world_bounds(world_pos) {
+        return 0u;
+    }
+    let cc = world_to_chunk(world_pos);
+    let slot_offset = chunk_map[chunk_map_index(cc)];
+    if slot_offset == 0xFFFFFFFFu {
+        return 0u;
+    }
+    let local = world_to_local(world_pos);
+    let vi = voxel_index(local);
+    return unpack_material_id(voxel_pool[(slot_offset / 8u) + vi]);
+}
+
+/// Sample temperature at a world-space voxel position. Returns 0 for out-of-bounds
+/// or unloaded chunks.
+fn sample_temperature_world(world_pos: vec3<i32>) -> u32 {
+    if !in_world_bounds(world_pos) {
+        return 0u;
+    }
+    let cc = world_to_chunk(world_pos);
+    let slot_offset = chunk_map[chunk_map_index(cc)];
+    if slot_offset == 0xFFFFFFFFu {
+        return 0u;
+    }
+    let local = world_to_local(world_pos);
+    let vi = voxel_index(local);
+    return unpack_temperature(voxel_pool[(slot_offset / 8u) + vi]);
+}
+
+// ─── AABB intersection ─────────────────────────────────────────────────
+
+/// AABB ray intersection. Returns (t_near, t_far). If t_near > t_far, no hit.
 fn intersect_aabb(ray_origin: vec3<f32>, ray_dir_inv: vec3<f32>, box_min: vec3<f32>, box_max: vec3<f32>) -> vec2<f32> {
     let t1 = (box_min - ray_origin) * ray_dir_inv;
     let t2 = (box_max - ray_origin) * ray_dir_inv;
@@ -52,27 +146,9 @@ fn intersect_aabb(ray_origin: vec3<f32>, ray_dir_inv: vec3<f32>, box_min: vec3<f
     return vec2<f32>(t_near, t_far);
 }
 
-// Sample the voxel at integer position. Returns material ID (0 = air).
-fn sample_voxel(pos: vec3<i32>) -> u32 {
-    if !in_bounds(pos) {
-        return 0u;
-    }
-    let idx = voxel_index(pos);
-    let v = voxel_buffer[idx];
-    return unpack_material_id(v);
-}
+// ─── Heatmap color ─────────────────────────────────────────────────────
 
-// Sample voxel temperature at integer position (0 if out of bounds or air).
-fn sample_temperature(pos: vec3<i32>) -> u32 {
-    if !in_bounds(pos) {
-        return 0u;
-    }
-    let idx = voxel_index(pos);
-    let v = voxel_buffer[idx];
-    return unpack_temperature(v);
-}
-
-// Convert temperature to heatmap color: blue(cold) -> cyan -> green -> yellow -> red(hot).
+/// Convert temperature to heatmap color: blue(cold) -> cyan -> green -> yellow -> red(hot).
 fn heatmap_color(temp: u32) -> vec3<f32> {
     // Normalize to [0,1] range over 0-4095 quantized range
     let t = clamp(f32(temp) / 4095.0, 0.0, 1.0);
@@ -92,36 +168,68 @@ fn heatmap_color(temp: u32) -> vec3<f32> {
     }
 }
 
-// DDA ray march. Returns hit info: (did_hit, hit_position, normal, material_id).
-fn ray_march(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> vec4<f32> {
-    // Inverse direction for AABB test (avoid division by zero with large values)
-    let inv_dir = vec3<f32>(
+// ─── Inverse direction helper ──────────────────────────────────────────
+
+/// Compute safe inverse ray direction (avoid division by zero).
+fn safe_inv_dir(ray_dir: vec3<f32>) -> vec3<f32> {
+    return vec3<f32>(
         select(1.0 / ray_dir.x, 1e30, abs(ray_dir.x) < 1e-8),
         select(1.0 / ray_dir.y, 1e30, abs(ray_dir.y) < 1e-8),
         select(1.0 / ray_dir.z, 1e30, abs(ray_dir.z) < 1e-8),
     );
+}
 
-    let chunk_min = vec3<f32>(0.0, 0.0, 0.0);
-    let chunk_max = vec3<f32>(f32(CHUNK_SIZE), f32(CHUNK_SIZE), f32(CHUNK_SIZE));
+// ─── Two-level DDA ray march ───────────────────────────────────────────
 
-    let aabb_hit = intersect_aabb(ray_origin, inv_dir, chunk_min, chunk_max);
+/// Result of a ray march hit. Encoded as:
+///   x = material_id (negative if miss)
+///   y = last_axis stepped (0=x, 1=y, 2=z)
+///   z = step sign on last_axis (for normal reconstruction)
+///   w = t value at hit point (distance along ray)
+struct RayHit {
+    mat_id: i32,
+    last_axis: i32,
+    step_sign: i32,
+    t_hit: f32,
+    hit_voxel: vec3<i32>,
+}
+
+/// Two-level DDA ray march through the multi-chunk world.
+/// Outer level: DDA through chunk grid (8x4x8).
+/// Inner level: DDA through voxels within a non-empty chunk (32^3).
+fn ray_march(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> RayHit {
+    var result: RayHit;
+    result.mat_id = -1;
+    result.last_axis = 0;
+    result.step_sign = 0;
+    result.t_hit = 0.0;
+    result.hit_voxel = vec3<i32>(0, 0, 0);
+
+    let inv_dir = safe_inv_dir(ray_dir);
+
+    // World AABB
+    let world_min = vec3<f32>(0.0, 0.0, 0.0);
+    let world_max = vec3<f32>(f32(WORLD_VOXELS_X), f32(WORLD_VOXELS_Y), f32(WORLD_VOXELS_Z));
+
+    let aabb_hit = intersect_aabb(ray_origin, inv_dir, world_min, world_max);
     if aabb_hit.x > aabb_hit.y || aabb_hit.y < 0.0 {
-        return vec4<f32>(-1.0, 0.0, 0.0, 0.0); // miss
+        return result; // miss
     }
 
-    // Start position: clamp t to at least a small epsilon past 0
+    // Entry point into the world AABB
     let t_start = max(aabb_hit.x, 0.001);
     var pos = ray_origin + ray_dir * t_start;
 
-    // Current voxel (integer coordinates)
+    // Clamp entry position to world bounds (handle floating point edge cases)
+    pos = clamp(pos, world_min + vec3<f32>(0.0001), world_max - vec3<f32>(0.0001));
+
+    // Current voxel in world space
     var voxel = vec3<i32>(
         i32(floor(pos.x)),
         i32(floor(pos.y)),
         i32(floor(pos.z)),
     );
-
-    // Clamp starting voxel to valid range (edge case: exactly on boundary)
-    voxel = clamp(voxel, vec3<i32>(0), vec3<i32>(i32(CHUNK_SIZE) - 1));
+    voxel = clamp(voxel, vec3<i32>(0), vec3<i32>(i32(WORLD_VOXELS_X) - 1, i32(WORLD_VOXELS_Y) - 1, i32(WORLD_VOXELS_Z) - 1));
 
     // DDA step direction
     let step = vec3<i32>(
@@ -130,26 +238,41 @@ fn ray_march(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> vec4<f32> {
         select(-1, 1, ray_dir.z >= 0.0),
     );
 
-    // Distance along ray to next voxel boundary for each axis
+    // DDA t_max and t_delta for voxel-level traversal
     let next_boundary = vec3<f32>(
         f32(voxel.x) + select(0.0, 1.0, ray_dir.x >= 0.0),
         f32(voxel.y) + select(0.0, 1.0, ray_dir.y >= 0.0),
         f32(voxel.z) + select(0.0, 1.0, ray_dir.z >= 0.0),
     );
-
     var t_max_axis = (next_boundary - ray_origin) * inv_dir;
     let t_delta = abs(inv_dir);
 
-    // Track which axis was last stepped for face normal
+    // Track DDA state
     var last_axis = 0;
+    var total_steps = 0u;
 
-    // Check starting voxel first
-    let start_mat = sample_voxel(voxel);
+    // Check starting voxel
+    let start_mat = sample_voxel_world(voxel);
     if start_mat != 0u {
-        return vec4<f32>(f32(start_mat), f32(voxel.x), f32(voxel.y), f32(voxel.z));
+        result.mat_id = i32(start_mat);
+        result.last_axis = 0;
+        result.step_sign = 0;
+        result.t_hit = t_start;
+        result.hit_voxel = voxel;
+        return result;
     }
 
-    // DDA traversal
+    // Determine the current chunk for the starting voxel
+    var current_chunk = world_to_chunk(voxel);
+    var current_slot_offset = 0xFFFFFFFFu;
+    if in_chunk_grid(current_chunk) {
+        current_slot_offset = chunk_map[chunk_map_index(current_chunk)];
+    }
+
+    // Main DDA loop — two-level traversal
+    // We step voxel-by-voxel, but when crossing chunk boundaries we check
+    // the chunk_map. If the new chunk is empty/unloaded, we skip ahead to
+    // the next chunk boundary by fast-forwarding the DDA.
     for (var i = 0u; i < MAX_RAY_STEPS; i++) {
         // Step along the axis with smallest t_max
         if t_max_axis.x < t_max_axis.y {
@@ -174,22 +297,108 @@ fn ray_march(ray_origin: vec3<f32>, ray_dir: vec3<f32>) -> vec4<f32> {
             }
         }
 
-        // Out of bounds check
-        if !in_bounds(voxel) {
-            return vec4<f32>(-1.0, 0.0, 0.0, 0.0);
+        // Out of world bounds — ray exited the world
+        if !in_world_bounds(voxel) {
+            return result;
         }
 
-        let mat = sample_voxel(voxel);
+        // Check if we crossed into a new chunk
+        let new_chunk = world_to_chunk(voxel);
+        if new_chunk.x != current_chunk.x || new_chunk.y != current_chunk.y || new_chunk.z != current_chunk.z {
+            current_chunk = new_chunk;
+            current_slot_offset = chunk_map[chunk_map_index(current_chunk)];
+
+            // If chunk is empty/unloaded, skip to the far side of this chunk
+            if current_slot_offset == 0xFFFFFFFFu {
+                // Compute the AABB of this chunk in world-space
+                let chunk_min = vec3<f32>(
+                    f32(current_chunk.x * i32(CHUNK_SIZE)),
+                    f32(current_chunk.y * i32(CHUNK_SIZE)),
+                    f32(current_chunk.z * i32(CHUNK_SIZE)),
+                );
+                let chunk_max = chunk_min + vec3<f32>(f32(CHUNK_SIZE));
+
+                // Find the t value where the ray exits this chunk
+                let t_exit = intersect_aabb(ray_origin, inv_dir, chunk_min, chunk_max);
+
+                // Advance to just past the chunk exit
+                let t_skip = t_exit.y + 0.001;
+                let skip_pos = ray_origin + ray_dir * t_skip;
+
+                // Compute the new voxel at the skip position
+                let new_voxel = vec3<i32>(
+                    i32(floor(skip_pos.x)),
+                    i32(floor(skip_pos.y)),
+                    i32(floor(skip_pos.z)),
+                );
+
+                // Check if we are still in world bounds after skip
+                if !in_world_bounds(new_voxel) {
+                    return result;
+                }
+
+                // Reset DDA state at the new position
+                voxel = clamp(new_voxel, vec3<i32>(0), vec3<i32>(i32(WORLD_VOXELS_X) - 1, i32(WORLD_VOXELS_Y) - 1, i32(WORLD_VOXELS_Z) - 1));
+                let new_boundary = vec3<f32>(
+                    f32(voxel.x) + select(0.0, 1.0, ray_dir.x >= 0.0),
+                    f32(voxel.y) + select(0.0, 1.0, ray_dir.y >= 0.0),
+                    f32(voxel.z) + select(0.0, 1.0, ray_dir.z >= 0.0),
+                );
+                t_max_axis = (new_boundary - ray_origin) * inv_dir;
+
+                // Update current_chunk for the position we skipped to
+                current_chunk = world_to_chunk(voxel);
+                if in_chunk_grid(current_chunk) {
+                    current_slot_offset = chunk_map[chunk_map_index(current_chunk)];
+                } else {
+                    current_slot_offset = 0xFFFFFFFFu;
+                }
+
+                // Check voxel at new position
+                if current_slot_offset != 0xFFFFFFFFu {
+                    let local = world_to_local(voxel);
+                    let vi = voxel_index(local);
+                    let mat = unpack_material_id(voxel_pool[(current_slot_offset / 8u) + vi]);
+                    if mat != 0u {
+                        result.mat_id = i32(mat);
+                        result.last_axis = last_axis;
+                        result.step_sign = -step[last_axis];
+                        result.t_hit = t_skip;
+                        result.hit_voxel = voxel;
+                        return result;
+                    }
+                }
+                continue;
+            }
+        }
+
+        // Current chunk is loaded — sample the voxel directly from pool
+        let local = world_to_local(voxel);
+        let vi = voxel_index(local);
+        let mat = unpack_material_id(voxel_pool[(current_slot_offset / 8u) + vi]);
         if mat != 0u {
-            // Encode: material in x, hit position in yzw, normal via last_axis
-            return vec4<f32>(f32(mat), f32(last_axis), f32(-step[last_axis]), 0.0);
+            // Compute approximate t at hit
+            let t_hit_val = select(
+                select(t_max_axis.z - t_delta.z, t_max_axis.y - t_delta.y, last_axis == 1),
+                t_max_axis.x - t_delta.x,
+                last_axis == 0,
+            );
+            result.mat_id = i32(mat);
+            result.last_axis = last_axis;
+            result.step_sign = -step[last_axis];
+            result.t_hit = t_hit_val;
+            result.hit_voxel = voxel;
+            return result;
         }
     }
 
-    return vec4<f32>(-1.0, 0.0, 0.0, 0.0); // exceeded max steps
+    return result; // exceeded max steps
 }
 
-// Shadow ray: returns 1.0 if lit, 0.0 if occluded.
+// ─── Shadow ray ────────────────────────────────────────────────────────
+
+/// Shadow ray using sample_voxel_world (simple single-level DDA for shadows).
+/// Returns 1.0 if lit, 0.0 if occluded.
 fn trace_shadow(origin: vec3<f32>, light_pos: vec3<f32>) -> f32 {
     let to_light = light_pos - origin;
     let light_dist = length(to_light);
@@ -198,18 +407,22 @@ fn trace_shadow(origin: vec3<f32>, light_pos: vec3<f32>) -> f32 {
     }
     let ray_dir = to_light / light_dist;
 
-    let inv_dir = vec3<f32>(
-        select(1.0 / ray_dir.x, 1e30, abs(ray_dir.x) < 1e-8),
-        select(1.0 / ray_dir.y, 1e30, abs(ray_dir.y) < 1e-8),
-        select(1.0 / ray_dir.z, 1e30, abs(ray_dir.z) < 1e-8),
-    );
+    let inv_dir = safe_inv_dir(ray_dir);
+
+    // World AABB intersection for early exit
+    let world_min = vec3<f32>(0.0, 0.0, 0.0);
+    let world_max = vec3<f32>(f32(WORLD_VOXELS_X), f32(WORLD_VOXELS_Y), f32(WORLD_VOXELS_Z));
+    let aabb_hit = intersect_aabb(origin, inv_dir, world_min, world_max);
+    if aabb_hit.x > aabb_hit.y || aabb_hit.y < 0.0 {
+        return 1.0; // ray does not intersect world
+    }
 
     var voxel = vec3<i32>(
         i32(floor(origin.x)),
         i32(floor(origin.y)),
         i32(floor(origin.z)),
     );
-    voxel = clamp(voxel, vec3<i32>(0), vec3<i32>(i32(CHUNK_SIZE) - 1));
+    voxel = clamp(voxel, vec3<i32>(0), vec3<i32>(i32(WORLD_VOXELS_X) - 1, i32(WORLD_VOXELS_Y) - 1, i32(WORLD_VOXELS_Z) - 1));
 
     let step = vec3<i32>(
         select(-1, 1, ray_dir.x >= 0.0),
@@ -255,17 +468,20 @@ fn trace_shadow(origin: vec3<f32>, light_pos: vec3<f32>) -> f32 {
             return 1.0;
         }
 
-        if !in_bounds(voxel) {
+        // Out of world bounds — no more voxels to check.
+        if !in_world_bounds(voxel) {
             return 1.0;
         }
 
-        if sample_voxel(voxel) != 0u {
+        if sample_voxel_world(voxel) != 0u {
             return 0.0; // occluded
         }
     }
 
     return 1.0;
 }
+
+// ─── Main entry point ──────────────────────────────────────────────────
 
 @compute @workgroup_size(8, 8, 1)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
@@ -293,95 +509,28 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     let hit = ray_march(ray_origin, ray_dir);
 
-    if hit.x < 0.0 {
+    if hit.mat_id < 0 {
         textureStore(output_texture, vec2<u32>(global_id.xy), SKY_COLOR);
         return;
     }
 
-    let mat_id = u32(hit.x);
-    let last_axis = i32(hit.y);
-    let step_sign = i32(hit.z);
+    let mat_id = u32(hit.mat_id);
 
-    // Reconstruct face normal from DDA axis
+    // Reconstruct face normal from DDA axis and step sign
     var normal = vec3<f32>(0.0, 0.0, 0.0);
-    normal[last_axis] = f32(step_sign);
-
-    // Reconstruct hit position by tracing to the exact voxel face
-    // We need to re-trace to find the actual hit voxel for position
-    let inv_dir_main = vec3<f32>(
-        select(1.0 / ray_dir.x, 1e30, abs(ray_dir.x) < 1e-8),
-        select(1.0 / ray_dir.y, 1e30, abs(ray_dir.y) < 1e-8),
-        select(1.0 / ray_dir.z, 1e30, abs(ray_dir.z) < 1e-8),
-    );
-    let chunk_min = vec3<f32>(0.0, 0.0, 0.0);
-    let chunk_max = vec3<f32>(f32(CHUNK_SIZE), f32(CHUNK_SIZE), f32(CHUNK_SIZE));
-    let aabb_hit = intersect_aabb(ray_origin, inv_dir_main, chunk_min, chunk_max);
-    let t_start = max(aabb_hit.x, 0.001);
-    var trace_pos = ray_origin + ray_dir * t_start;
-    var trace_voxel = clamp(
-        vec3<i32>(i32(floor(trace_pos.x)), i32(floor(trace_pos.y)), i32(floor(trace_pos.z))),
-        vec3<i32>(0),
-        vec3<i32>(i32(CHUNK_SIZE) - 1),
-    );
-
-    // If the starting voxel is already the hit, use trace_pos
-    var hit_pos = trace_pos;
-    let start_mat_check = sample_voxel(trace_voxel);
-    if start_mat_check == 0u {
-        // Step through DDA again to find exact hit T
-        let dda_step = vec3<i32>(
-            select(-1, 1, ray_dir.x >= 0.0),
-            select(-1, 1, ray_dir.y >= 0.0),
-            select(-1, 1, ray_dir.z >= 0.0),
-        );
-        let next_b = vec3<f32>(
-            f32(trace_voxel.x) + select(0.0, 1.0, ray_dir.x >= 0.0),
-            f32(trace_voxel.y) + select(0.0, 1.0, ray_dir.y >= 0.0),
-            f32(trace_voxel.z) + select(0.0, 1.0, ray_dir.z >= 0.0),
-        );
-        var tm = (next_b - ray_origin) * inv_dir_main;
-        let td = abs(inv_dir_main);
-        var t_hit = 0.0;
-
-        for (var i = 0u; i < MAX_RAY_STEPS; i++) {
-            if tm.x < tm.y {
-                if tm.x < tm.z {
-                    t_hit = tm.x;
-                    trace_voxel.x += dda_step.x;
-                    tm.x += td.x;
-                } else {
-                    t_hit = tm.z;
-                    trace_voxel.z += dda_step.z;
-                    tm.z += td.z;
-                }
-            } else {
-                if tm.y < tm.z {
-                    t_hit = tm.y;
-                    trace_voxel.y += dda_step.y;
-                    tm.y += td.y;
-                } else {
-                    t_hit = tm.z;
-                    trace_voxel.z += dda_step.z;
-                    tm.z += td.z;
-                }
-            }
-            if !in_bounds(trace_voxel) { break; }
-            if sample_voxel(trace_voxel) != 0u {
-                hit_pos = ray_origin + ray_dir * t_hit;
-                break;
-            }
-        }
+    // Handle the case where step_sign is 0 (starting voxel hit) — default to Y-up normal
+    if hit.step_sign == 0 {
+        normal = vec3<f32>(0.0, 1.0, 0.0);
+    } else {
+        normal[hit.last_axis] = f32(hit.step_sign);
     }
+
+    // Compute hit position from t_hit
+    let hit_pos = ray_origin + ray_dir * hit.t_hit;
 
     // Heatmap mode: render temperature as color gradient
     if camera.render_mode == 1u {
-        // Re-trace to find the hit voxel position for temperature sampling
-        var heatmap_voxel = trace_voxel;
-        if start_mat_check == 0u {
-            // Find the hit voxel by re-tracing (already done above for hit_pos)
-            heatmap_voxel = trace_voxel; // trace_voxel was updated in the DDA loop above
-        }
-        let temp = sample_temperature(heatmap_voxel);
+        let temp = sample_temperature_world(hit.hit_voxel);
         let heat_color = heatmap_color(temp);
 
         // Apply basic shading to heatmap
