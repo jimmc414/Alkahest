@@ -7,7 +7,7 @@
 // Buffers:
 //   @group(0) @binding(0) read_buf      — storage, read (unused, shared layout)
 //   @group(0) @binding(1) write_buf     — storage, read_write (post-movement state)
-//   @group(0) @binding(2) materials     — storage, read (2x vec4<f32> per material)
+//   @group(0) @binding(2) materials     — storage, read (3x vec4<f32> per material)
 //   @group(0) @binding(3) cmd_buf       — storage, read (unused, shared layout)
 //   @group(0) @binding(4) uniforms      — uniform (tick, material_count)
 //   @group(0) @binding(5) rule_lookup   — storage, read (flat 2D: mat_a * count + mat_b -> rule index)
@@ -89,7 +89,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     // --- Self-decay ---
     // Read material properties: props_1 = (decay_rate, decay_threshold, decay_product_id, viscosity)
-    let props_1 = materials[mat_id * 2u + 1u];
+    let props_1 = materials[mat_id * 3u + 1u];
     let decay_rate = u32(props_1.x);
     let decay_threshold = u32(props_1.y);
     let decay_product = u32(props_1.z);
@@ -111,6 +111,16 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
         // Update temperature in voxel (even if no transform)
         voxel = repack_material_temp(voxel, mat_id, my_temp);
+    }
+
+    // --- Upward phase change (heating: e.g. Ice->Water, Water->Steam, Stone->Lava) ---
+    {
+        let props_2 = materials[unpack_material_id(voxel) * 3u + 2u];
+        let phase_change_temp_q = u32(props_2.y);
+        let phase_change_product = u32(props_2.z);
+        if phase_change_temp_q > 0u && my_temp >= phase_change_temp_q {
+            voxel = repack_material_temp(voxel, phase_change_product, my_temp);
+        }
     }
 
     // --- Pairwise reactions ---
