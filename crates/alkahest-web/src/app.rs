@@ -410,13 +410,17 @@ impl Application {
                     let wx = target.x as i32;
                     let wy = (target.y + 1.0) as i32;
                     let wz = target.z as i32;
+                    let br = tool_state.brush.radius;
+                    let bs = tool_state.brush.shape.as_u32();
                     if let Some((cdi, lx, ly, lz)) =
                         Self::world_to_dispatch_coords(wx, wy, wz, &dispatch_list)
                     {
                         if input.shift_down {
-                            tools::remove::execute(sim, lx, ly, lz, cdi);
+                            tools::remove::execute(sim, lx, ly, lz, cdi, br, bs);
                         } else {
-                            tools::place::execute(sim, lx, ly, lz, tool_state.place_material, cdi);
+                            tools::place::execute(
+                                sim, lx, ly, lz, tool_state.place_material, cdi, br, bs,
+                            );
                         }
                     }
                 }
@@ -427,6 +431,8 @@ impl Application {
                     let wx = target.x as i32;
                     let wy = (target.y + 1.0) as i32;
                     let wz = target.z as i32;
+                    let br = tool_state.brush.radius;
+                    let bs = tool_state.brush.shape.as_u32();
                     if let Some((cdi, lx, ly, lz)) =
                         Self::world_to_dispatch_coords(wx, wy, wz, &dispatch_list)
                     {
@@ -437,6 +443,8 @@ impl Application {
                             lz,
                             alkahest_core::constants::TOOL_HEAT_DELTA,
                             cdi,
+                            br,
+                            bs,
                         );
                     }
                 }
@@ -447,6 +455,8 @@ impl Application {
                     let wx = target.x as i32;
                     let wy = (target.y + 1.0) as i32;
                     let wz = target.z as i32;
+                    let br = tool_state.brush.radius;
+                    let bs = tool_state.brush.shape.as_u32();
                     if let Some((cdi, lx, ly, lz)) =
                         Self::world_to_dispatch_coords(wx, wy, wz, &dispatch_list)
                     {
@@ -457,6 +467,8 @@ impl Application {
                             lz,
                             alkahest_core::constants::TOOL_FREEZE_DELTA,
                             cdi,
+                            br,
+                            bs,
                         );
                     }
                 }

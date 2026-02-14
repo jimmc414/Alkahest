@@ -33,10 +33,9 @@ pub async fn init_gpu(
         ..Default::default()
     });
 
-    let surface_target = wgpu::SurfaceTarget::Canvas(canvas);
     // Canvas is owned by the DOM and lives for 'static in the web backend.
     let surface: Surface<'static> = instance
-        .create_surface(surface_target)
+        .create_surface(wgpu::SurfaceTarget::Canvas(canvas))
         .map_err(|e| AlkahestError::SurfaceConfigFailed(format!("{e}")))?;
 
     let adapter = instance

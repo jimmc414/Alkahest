@@ -1,3 +1,4 @@
+use crate::commands;
 use alkahest_sim::pipeline::SimPipeline;
 
 /// Execute the heat tool: raise temperature of existing voxels at the given local position.
@@ -10,16 +11,8 @@ pub fn execute_heat(
     z: i32,
     temp_delta: i32,
     chunk_dispatch_idx: u32,
+    brush_radius: u32,
+    brush_shape: u32,
 ) {
-    use alkahest_sim::pipeline::SimCommand;
-    sim.enqueue_command(SimCommand {
-        tool_type: 3, // TOOL_HEAT
-        pos_x: x,
-        pos_y: y,
-        pos_z: z,
-        material_id: temp_delta as u32, // reused as signed temp delta (bitcast in shader)
-        chunk_dispatch_idx,
-        _pad1: 0,
-        _pad2: 0,
-    });
+    commands::heat_voxel(sim, x, y, z, temp_delta, chunk_dispatch_idx, brush_radius, brush_shape);
 }

@@ -11,8 +11,10 @@ pub struct SimCommand {
     pub pos_z: i32,
     pub material_id: u32,
     pub chunk_dispatch_idx: u32,
-    pub _pad1: u32,
-    pub _pad2: u32,
+    /// Brush radius: 0 = single voxel, 1–16 for area brushes.
+    pub brush_radius: u32,
+    /// Brush shape: 0 = single, 1 = cube, 2 = sphere.
+    pub brush_shape: u32,
 }
 
 /// Tool type constants matching the shader.
@@ -22,6 +24,8 @@ pub const TOOL_PLACE: u32 = 1;
 pub const TOOL_REMOVE: u32 = 2;
 #[allow(dead_code)]
 pub const TOOL_HEAT: u32 = 3;
+#[allow(dead_code)]
+pub const TOOL_PUSH: u32 = 4;
 
 /// GPU-uploadable simulation parameters. Must match SimParams in commands.wgsl.
 #[repr(C)]
