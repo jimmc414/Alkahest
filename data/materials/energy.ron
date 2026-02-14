@@ -10,6 +10,7 @@
         decay_threshold: 512,
         decay_product: 6,
         thermal_conductivity: 0.01,
+        structural_integrity: 0.0,
     ),
     (
         id: 6,
@@ -22,6 +23,7 @@
         decay_threshold: 100,
         decay_product: 0,
         thermal_conductivity: 0.01,
+        structural_integrity: 0.0,
     ),
     (
         id: 7,
@@ -34,6 +36,7 @@
         decay_threshold: 120,
         decay_product: 3,
         thermal_conductivity: 0.05,
+        structural_integrity: 0.0,
     ),
     (
         id: 11,
@@ -47,5 +50,6 @@
         decay_rate: 1,
         decay_threshold: 614,
         decay_product: 1,
+        structural_integrity: 0.0,
     ),
 ]
