@@ -11,6 +11,7 @@ alkahest-core = { path = "../alkahest-core" }
 alkahest-render = { path = "../alkahest-render" }
 alkahest-rules = { path = "../alkahest-rules" }
 alkahest-sim = { path = "../alkahest-sim" }
+alkahest-world = { path = "../alkahest-world" }
 wgpu = { workspace = true }
 glam = { workspace = true }
 bytemuck = { workspace = true }

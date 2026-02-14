@@ -1,5 +1,5 @@
-/// Debug panel displaying adapter info, frame timing, simulation state, and camera info
-/// (C-PERF-5: pre-allocated strings).
+/// Debug panel displaying adapter info, frame timing, simulation state, camera info,
+/// and chunk statistics (C-PERF-5: pre-allocated strings).
 pub struct DebugPanel {
     adapter_name: String,
     backend: String,
@@ -10,6 +10,9 @@ pub struct DebugPanel {
     camera_target: [f32; 3],
     sim_tick: u64,
     sim_paused: bool,
+    chunk_total: u32,
+    chunk_active: u32,
+    chunk_static: u32,
 }
 
 impl DebugPanel {
@@ -24,6 +27,9 @@ impl DebugPanel {
             camera_target: [0.0; 3],
             sim_tick: 0,
             sim_paused: false,
+            chunk_total: 0,
+            chunk_active: 0,
+            chunk_static: 0,
         }
     }
 
@@ -45,6 +51,13 @@ impl DebugPanel {
     pub fn set_sim_info(&mut self, tick: u64, paused: bool) {
         self.sim_tick = tick;
         self.sim_paused = paused;
+    }
+
+    /// Update chunk statistics for display.
+    pub fn set_chunk_info(&mut self, total: u32, active: u32, static_count: u32) {
+        self.chunk_total = total;
+        self.chunk_active = active;
+        self.chunk_static = static_count;
     }
 
     /// Render the debug panel using egui.
@@ -74,6 +87,11 @@ impl DebugPanel {
                 ui.label(format!(
                     "Target: ({:.1}, {:.1}, {:.1})",
                     self.camera_target[0], self.camera_target[1], self.camera_target[2]
+                ));
+                ui.separator();
+                ui.label(format!(
+                    "Chunks: {} loaded | {} active | {} static",
+                    self.chunk_total, self.chunk_active, self.chunk_static
                 ));
             });
     }

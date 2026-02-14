@@ -4,8 +4,10 @@ use crate::input::InputState;
 use crate::tools::{self, ToolState};
 use crate::ui::debug::DebugPanel;
 use crate::ui::UiState;
+use alkahest_core::constants::*;
 use alkahest_render::{MaterialColor, Renderer};
 use alkahest_sim::pipeline::SimPipeline;
+use alkahest_world::World;
 use std::cell::RefCell;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
@@ -22,6 +24,7 @@ pub struct Application {
     gpu: GpuContext,
     renderer: Renderer,
     sim: SimPipeline,
+    world: World,
     camera: Camera,
     input_state: Rc<RefCell<InputState>>,
     ui_state: UiState,
@@ -30,6 +33,8 @@ pub struct Application {
     last_frame_time: f64,
     /// Render mode: 0 = normal, 1 = heatmap.
     render_mode: u32,
+    /// Octree for empty-space skipping in ray march.
+    octree: alkahest_render::octree::Octree,
 }
 
 impl Application {
@@ -57,14 +62,62 @@ impl Application {
 
         let sim = SimPipeline::new(&gpu.device, &gpu.queue, rule_data);
 
+        // Create world and generate terrain
+        let world = World::new();
+        let pool_slot_count = sim.pool_slot_count();
+
+        // Adjust world chunk map capacity to match actual GPU pool
+        // (World::new allocates with MAX_CHUNK_SLOTS, but GPU may have fewer)
+        if pool_slot_count < MAX_CHUNK_SLOTS {
+            log::warn!(
+                "GPU pool has {} slots (less than MAX_CHUNK_SLOTS={})",
+                pool_slot_count,
+                MAX_CHUNK_SLOTS
+            );
+        }
+
+        // Upload terrain data to GPU pool
+        for (coord, chunk) in world.chunk_map().iter() {
+            if let Some(pool_slot) = chunk.pool_slot {
+                let data = world.generate_chunk_data(*coord);
+                sim.chunk_pool()
+                    .upload_chunk_data_both(&gpu.queue, pool_slot, &data);
+            }
+        }
+
+        // Build initial chunk map for renderer (grid-indexed: cx + cy*X + cz*X*Y)
+        let chunk_map_data = Self::build_renderer_chunk_map(world.chunk_map());
+        renderer.update_chunk_map(&gpu.queue, &chunk_map_data);
+
+        // Build initial octree for empty-space skipping
+        let mut octree = alkahest_render::octree::Octree::new();
+        let chunk_occupancy: Vec<_> = world
+            .chunk_map()
+            .iter()
+            .map(|(coord, chunk)| (*coord, chunk.has_non_air))
+            .collect();
+        octree.rebuild(&chunk_occupancy);
+        renderer.update_octree(&gpu.queue, &octree.gpu_data());
+        octree.clear_dirty();
+
+        // Bind sim's read pool to renderer
+        renderer.update_voxel_pool(&gpu.device, sim.get_read_pool());
+
         let debug_panel = DebugPanel::new(gpu.adapter_name.clone(), gpu.backend.clone());
         let tool_state = ToolState::new();
-        let camera = Camera::new();
+
+        // Camera centered on the world
+        let mut camera = Camera::new();
+        let world_center_x = (WORLD_CHUNKS_X * CHUNK_SIZE) as f32 / 2.0;
+        let world_center_y = (WORLD_CHUNKS_Y * CHUNK_SIZE) as f32 / 4.0;
+        let world_center_z = (WORLD_CHUNKS_Z * CHUNK_SIZE) as f32 / 2.0;
+        camera.target = glam::Vec3::new(world_center_x, world_center_y, world_center_z);
 
         Self {
             gpu,
             renderer,
             sim,
+            world,
             camera,
             input_state,
             ui_state,
@@ -72,7 +125,29 @@ impl Application {
             tool_state,
             last_frame_time: 0.0,
             render_mode: 0,
+            octree,
         }
+    }
+
+    /// Build a flat grid-indexed chunk map for the renderer.
+    /// Index: cz * WORLD_CHUNKS_X * WORLD_CHUNKS_Y + cy * WORLD_CHUNKS_X + cx
+    /// Value: pool_slot * BYTES_PER_CHUNK (byte offset) or SENTINEL_NEIGHBOR
+    fn build_renderer_chunk_map(chunk_map: &alkahest_world::chunk_map::ChunkMap) -> Vec<u32> {
+        let total = (WORLD_CHUNKS_X * WORLD_CHUNKS_Y * WORLD_CHUNKS_Z) as usize;
+        let mut data = vec![SENTINEL_NEIGHBOR; total];
+
+        for (coord, chunk) in chunk_map.iter() {
+            if let Some(pool_slot) = chunk.pool_slot {
+                let idx = coord.z as u32 * WORLD_CHUNKS_X * WORLD_CHUNKS_Y
+                    + coord.y as u32 * WORLD_CHUNKS_X
+                    + coord.x as u32;
+                if (idx as usize) < total {
+                    data[idx as usize] = pool_slot * BYTES_PER_CHUNK;
+                }
+            }
+        }
+
+        data
     }
 
     /// Load, validate, and compile rule engine data from embedded RON files.
@@ -175,6 +250,32 @@ impl Application {
             .expect("rAF registration failed");
     }
 
+    /// Convert world-space voxel coordinates to (chunk_dispatch_idx, local_x, local_y, local_z).
+    /// Returns None if the position is outside world bounds or the chunk is not dispatched.
+    fn world_to_dispatch_coords(
+        wx: i32,
+        wy: i32,
+        wz: i32,
+        dispatch_list: &alkahest_world::dispatch::DispatchList,
+    ) -> Option<(u32, i32, i32, i32)> {
+        let cs = CHUNK_SIZE as i32;
+        let cx = wx.div_euclid(cs);
+        let cy = wy.div_euclid(cs);
+        let cz = wz.div_euclid(cs);
+
+        // Find this chunk in the dispatch list
+        let chunk_coord = glam::IVec3::new(cx, cy, cz);
+        for (i, entry) in dispatch_list.entries.iter().enumerate() {
+            if entry.coord == chunk_coord {
+                let lx = wx.rem_euclid(cs);
+                let ly = wy.rem_euclid(cs);
+                let lz = wz.rem_euclid(cs);
+                return Some((i as u32, lx, ly, lz));
+            }
+        }
+        None
+    }
+
     /// Render a single frame.
     fn render_frame(&mut self) {
         // Destructure self for disjoint field borrows
@@ -182,19 +283,34 @@ impl Application {
             gpu,
             renderer,
             sim,
+            world,
             camera,
             input_state,
             ui_state,
             debug_panel,
             tool_state,
             render_mode,
+            octree,
             ..
         } = self;
 
         let width = gpu.surface_config.width;
         let height = gpu.surface_config.height;
 
-        // 1. Read input and update camera + handle sim controls
+        // 1. Poll GPU readback from previous frame (C-GPU-8: non-blocking)
+        let dispatch_list = world.update(camera.target);
+
+        if let Some(flags) = sim.poll_readback(&gpu.device, dispatch_list.len() as u32) {
+            world.process_activity(&flags);
+        }
+
+        // Rebuild dispatch list after activity processing
+        let dispatch_list = world.update(camera.target);
+        let descriptor_data = dispatch_list.build_descriptor_data();
+        let active_chunk_count = dispatch_list.len() as u32;
+        let active_slots: Vec<u32> = dispatch_list.entries.iter().map(|e| e.pool_slot).collect();
+
+        // 2. Read input and update camera + handle sim controls
         {
             let mut input = input_state.borrow_mut();
 
@@ -249,55 +365,68 @@ impl Application {
                     camera.zoom(input.scroll_delta);
                 }
 
-                // Right-click: place/remove voxels
-                // Simple fixed-position placement for M2 (no raycasting yet)
+                // Right-click: place/remove voxels (world-space → local + dispatch idx)
                 if input.right_button_down {
                     let target = camera.target;
-                    let x = target.x as i32;
-                    let y = (target.y + 1.0) as i32;
-                    let z = target.z as i32;
-                    if input.shift_down {
-                        tools::remove::execute(sim, x, y, z);
-                    } else {
-                        tools::place::execute(sim, x, y, z, tool_state.place_material);
+                    let wx = target.x as i32;
+                    let wy = (target.y + 1.0) as i32;
+                    let wz = target.z as i32;
+                    if let Some((cdi, lx, ly, lz)) =
+                        Self::world_to_dispatch_coords(wx, wy, wz, &dispatch_list)
+                    {
+                        if input.shift_down {
+                            tools::remove::execute(sim, lx, ly, lz, cdi);
+                        } else {
+                            tools::place::execute(sim, lx, ly, lz, tool_state.place_material, cdi);
+                        }
                     }
                 }
 
                 // H key: heat tool (apply to voxel at camera target)
                 if input.keys_down.contains("h") {
                     let target = camera.target;
-                    let x = target.x as i32;
-                    let y = (target.y + 1.0) as i32;
-                    let z = target.z as i32;
-                    tools::heat::execute_heat(
-                        sim,
-                        x,
-                        y,
-                        z,
-                        alkahest_core::constants::TOOL_HEAT_DELTA,
-                    );
+                    let wx = target.x as i32;
+                    let wy = (target.y + 1.0) as i32;
+                    let wz = target.z as i32;
+                    if let Some((cdi, lx, ly, lz)) =
+                        Self::world_to_dispatch_coords(wx, wy, wz, &dispatch_list)
+                    {
+                        tools::heat::execute_heat(
+                            sim,
+                            lx,
+                            ly,
+                            lz,
+                            alkahest_core::constants::TOOL_HEAT_DELTA,
+                            cdi,
+                        );
+                    }
                 }
 
                 // F key: freeze tool (apply to voxel at camera target)
                 if input.keys_down.contains("f") {
                     let target = camera.target;
-                    let x = target.x as i32;
-                    let y = (target.y + 1.0) as i32;
-                    let z = target.z as i32;
-                    tools::heat::execute_heat(
-                        sim,
-                        x,
-                        y,
-                        z,
-                        alkahest_core::constants::TOOL_FREEZE_DELTA,
-                    );
+                    let wx = target.x as i32;
+                    let wy = (target.y + 1.0) as i32;
+                    let wz = target.z as i32;
+                    if let Some((cdi, lx, ly, lz)) =
+                        Self::world_to_dispatch_coords(wx, wy, wz, &dispatch_list)
+                    {
+                        tools::heat::execute_heat(
+                            sim,
+                            lx,
+                            ly,
+                            lz,
+                            alkahest_core::constants::TOOL_FREEZE_DELTA,
+                            cdi,
+                        );
+                    }
                 }
             }
 
             input.clear_deltas();
         }
 
-        // 2. Upload camera uniforms
+        // 3. Upload camera uniforms
         let cam_uniforms = camera.to_uniforms(width, height, *render_mode);
         renderer.update_camera(&gpu.queue, cam_uniforms);
 
@@ -305,14 +434,14 @@ impl Application {
         let vp = camera.view_proj(width as f32, height as f32);
         renderer.update_debug_uniforms(&gpu.queue, vp.to_cols_array_2d());
 
-        // Update debug panel camera info
+        // Update debug panel
         let eye = camera.eye_position();
         debug_panel.set_camera_info(eye.into(), camera.target.into());
-
-        // Update debug panel sim info
         debug_panel.set_sim_info(sim.tick_count(), sim.is_paused());
+        let (total, active, static_count) = world.chunk_counts();
+        debug_panel.set_chunk_info(total, active, static_count);
 
-        // 3. Get surface texture, handle Lost by reconfiguring
+        // 4. Get surface texture, handle Lost by reconfiguring
         let output = match gpu.surface.get_current_texture() {
             Ok(output) => output,
             Err(wgpu::SurfaceError::Lost) => {
@@ -331,7 +460,7 @@ impl Application {
 
         let surface_view = output.texture.create_view(&Default::default());
 
-        // 4. Run egui frame (before GPU encoding)
+        // 5. Run egui frame (before GPU encoding)
         let screen = ui_state.screen_descriptor(width, height);
 
         let raw_input = egui::RawInput {
@@ -353,25 +482,42 @@ impl Application {
             .ctx
             .tessellate(full_output.shapes, full_output.pixels_per_point);
 
-        // 5. Create command encoder
+        // 6. Create command encoder
         let mut encoder = gpu
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("frame-encoder"),
             });
 
-        // 6. Upload sim commands and dispatch simulation tick
+        // 7. Upload chunk descriptors and sim commands, dispatch simulation tick
+        sim.upload_chunk_descriptors(&gpu.queue, &descriptor_data);
         sim.upload_commands(&gpu.queue);
-        sim.tick(&gpu.device, &gpu.queue, &mut encoder);
+        sim.tick(
+            &gpu.device,
+            &gpu.queue,
+            &mut encoder,
+            active_chunk_count,
+            &active_slots,
+        );
 
-        // 7. Bind the sim's read buffer to the renderer (update bind group)
+        // 8. Bind the sim's read pool to the renderer (update bind group)
         // We do this every frame because the read buffer alternates after each tick.
-        renderer.update_voxel_buffer(&gpu.device, sim.get_read_buffer());
+        renderer.update_voxel_pool(&gpu.device, sim.get_read_pool());
 
-        // 8. Compute ray march + blit + debug lines
+        // Update renderer chunk map (in case chunks loaded/unloaded)
+        let chunk_map_data = Self::build_renderer_chunk_map(world.chunk_map());
+        renderer.update_chunk_map(&gpu.queue, &chunk_map_data);
+
+        // Update octree if dirty
+        if octree.is_dirty() {
+            renderer.update_octree(&gpu.queue, &octree.gpu_data());
+            octree.clear_dirty();
+        }
+
+        // 9. Compute ray march + blit + debug lines
         renderer.render(&mut encoder, &surface_view, width, height);
 
-        // 9. Upload egui textures and buffers
+        // 10. Upload egui textures and buffers
         for (id, delta) in &full_output.textures_delta.set {
             ui_state
                 .renderer
@@ -386,7 +532,7 @@ impl Application {
             &screen,
         );
 
-        // 10. egui render pass with LoadOp::Load (C-EGUI-2: after scene)
+        // 11. egui render pass with LoadOp::Load (C-EGUI-2: after scene)
         //     forget_lifetime() shifts the encoder guard from compile-time to run-time,
         //     avoiding borrow checker conflicts between encoder and renderer lifetimes.
         {
@@ -411,12 +557,12 @@ impl Application {
                 .render(&mut pass, &clipped_primitives, &screen);
         }
 
-        // 11. Free textures after rendering
+        // 12. Free textures after rendering
         for id in &full_output.textures_delta.free {
             ui_state.renderer.free_texture(id);
         }
 
-        // 12. Submit and present
+        // 13. Submit and present
         gpu.queue.submit(std::iter::once(encoder.finish()));
         output.present();
     }
