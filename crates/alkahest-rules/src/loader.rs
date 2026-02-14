@@ -110,23 +110,67 @@ mod tests {
 
     #[test]
     fn test_valid_materials_load() {
-        // Load all 12 materials from embedded RON data
+        // Load all materials from embedded RON data (12 base + 4 M6)
         let naturals = include_str!("../../../data/materials/naturals.ron");
         let organics = include_str!("../../../data/materials/organics.ron");
         let energy = include_str!("../../../data/materials/energy.ron");
-        let table = load_all_materials(&[naturals, organics, energy]).expect("should load");
-        assert_eq!(table.len(), 12);
+        let explosives = include_str!("../../../data/materials/explosives.ron");
+        let table =
+            load_all_materials(&[naturals, organics, energy, explosives]).expect("should load");
+        assert_eq!(table.len(), 16);
     }
 
     #[test]
     fn test_valid_rules_load() {
-        // Load all 15 rules from embedded RON data
+        // Load all rules from embedded RON data (combustion + structural)
         let combustion = include_str!("../../../data/rules/combustion.ron");
-        let set = load_all_rules(&[combustion]).expect("should load");
+        let structural = include_str!("../../../data/rules/structural.ron");
+        let set = load_all_rules(&[combustion, structural]).expect("should load");
         assert!(
-            set.len() >= 15,
-            "expected at least 15 rules, got {}",
+            set.len() >= 17,
+            "expected at least 17 rules, got {}",
             set.len()
         );
+    }
+
+    #[test]
+    fn test_new_materials_load() {
+        // M6: verify all 4 new materials parse correctly
+        let explosives = include_str!("../../../data/materials/explosives.ron");
+        let table = load_materials_from_str(explosives).expect("should parse explosives.ron");
+        assert_eq!(table.len(), 4);
+
+        let gunpowder = table.get(12).expect("Gunpowder (id=12) missing");
+        assert_eq!(gunpowder.name, "Gunpowder");
+        assert_eq!(gunpowder.structural_integrity, 5.0);
+
+        let sealed_metal = table.get(13).expect("Sealed-Metal (id=13) missing");
+        assert_eq!(sealed_metal.name, "Sealed-Metal");
+        assert_eq!(sealed_metal.structural_integrity, 60.0);
+
+        let glass = table.get(14).expect("Glass (id=14) missing");
+        assert_eq!(glass.name, "Glass");
+        assert_eq!(glass.structural_integrity, 8.0);
+
+        let shards = table.get(15).expect("Glass Shards (id=15) missing");
+        assert_eq!(shards.name, "Glass Shards");
+        assert_eq!(shards.structural_integrity, 0.0);
+    }
+
+    #[test]
+    fn test_gunpowder_rule_loads() {
+        // M6: verify gunpowder combustion rules parse with pressure_delta
+        let structural = include_str!("../../../data/rules/structural.ron");
+        let set = load_rules_from_str(structural).expect("should parse structural.ron");
+        assert_eq!(set.len(), 2);
+
+        let fire_rule = &set.rules[0];
+        assert_eq!(fire_rule.name, "Gunpowder+Fire explosion");
+        assert_eq!(fire_rule.pressure_delta, 60);
+        assert_eq!(fire_rule.temp_delta, 500);
+
+        let lava_rule = &set.rules[1];
+        assert_eq!(lava_rule.name, "Gunpowder+Lava explosion");
+        assert_eq!(lava_rule.pressure_delta, 55);
     }
 }
