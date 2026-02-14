@@ -181,3 +181,61 @@ impl Camera {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_camera_mode_toggle() {
+        let mut cam = Camera::new();
+        assert_eq!(cam.mode, CameraMode::Orbit);
+        cam.toggle_mode();
+        assert_eq!(cam.mode, CameraMode::FirstPerson);
+        cam.toggle_mode();
+        assert_eq!(cam.mode, CameraMode::Orbit);
+    }
+
+    #[test]
+    fn test_fp_collision_blocks_movement_into_occupied_chunk() {
+        let mut cam = Camera::new();
+        cam.mode = CameraMode::FirstPerson;
+        cam.fp_position = Vec3::new(16.0, 16.0, 16.0);
+        cam.yaw = 0.0; // forward = +Z
+
+        let initial_pos = cam.fp_position;
+
+        // All chunks occupied → no movement
+        cam.fp_move(1.0, 0.0, 0.0, 5.0, |_, _, _| true);
+        assert_eq!(
+            cam.fp_position, initial_pos,
+            "Should not move into occupied chunk"
+        );
+    }
+
+    #[test]
+    fn test_fp_movement_in_empty_world() {
+        let mut cam = Camera::new();
+        cam.mode = CameraMode::FirstPerson;
+        cam.fp_position = Vec3::new(16.0, 16.0, 16.0);
+        cam.yaw = 0.0;
+
+        let initial_pos = cam.fp_position;
+
+        // No chunks occupied → free movement
+        cam.fp_move(1.0, 0.0, 0.0, 5.0, |_, _, _| false);
+        assert_ne!(cam.fp_position, initial_pos, "Should move in empty world");
+    }
+
+    #[test]
+    fn test_orbit_eye_position() {
+        let cam = Camera::new();
+        let eye = cam.eye_position();
+        // Eye should be away from target
+        let dist = (eye - cam.target).length();
+        assert!(
+            (dist - cam.distance).abs() < 0.1,
+            "Eye distance should match camera distance"
+        );
+    }
+}

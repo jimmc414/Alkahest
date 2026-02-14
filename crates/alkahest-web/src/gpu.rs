@@ -34,9 +34,18 @@ pub async fn init_gpu(
     });
 
     // Canvas is owned by the DOM and lives for 'static in the web backend.
+    // SurfaceTarget::Canvas is only available on wasm32.
+    #[cfg(target_arch = "wasm32")]
     let surface: Surface<'static> = instance
         .create_surface(wgpu::SurfaceTarget::Canvas(canvas))
         .map_err(|e| AlkahestError::SurfaceConfigFailed(format!("{e}")))?;
+    #[cfg(not(target_arch = "wasm32"))]
+    let surface: Surface<'static> = {
+        let _ = (&instance, &canvas);
+        return Err(AlkahestError::SurfaceConfigFailed(
+            "Canvas surface requires wasm32 target".into(),
+        ));
+    };
 
     let adapter = instance
         .request_adapter(&RequestAdapterOptions {

@@ -170,3 +170,55 @@ pub fn show(ctx: &egui::Context, state: &mut BrowserState, current_material: u32
 
     selected
 }
+
+/// CPU-only: filter materials by search text. Returns matching (id, name) pairs.
+/// Used by tests and potential future autocomplete.
+pub fn filter_materials(search: &str) -> Vec<(u32, &'static str)> {
+    let search_lower = search.to_lowercase();
+    MATERIALS
+        .iter()
+        .filter(|mat| search_lower.is_empty() || mat.name.to_lowercase().contains(&search_lower))
+        .map(|mat| (mat.id, mat.name))
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_material_browser_search_water() {
+        let results = filter_materials("wat");
+        let names: Vec<&str> = results.iter().map(|(_, n)| *n).collect();
+        assert!(names.contains(&"Water"), "Should find Water for 'wat'");
+        assert!(!names.contains(&"Stone"), "Should not find Stone for 'wat'");
+    }
+
+    #[test]
+    fn test_material_browser_search_empty() {
+        let results = filter_materials("");
+        assert_eq!(results.len(), MATERIALS.len(), "Empty search returns all");
+    }
+
+    #[test]
+    fn test_material_browser_search_case_insensitive() {
+        let results = filter_materials("SAND");
+        let names: Vec<&str> = results.iter().map(|(_, n)| *n).collect();
+        assert!(names.contains(&"Sand"));
+    }
+
+    #[test]
+    fn test_material_browser_search_no_results() {
+        let results = filter_materials("zzzzz");
+        assert!(results.is_empty(), "No materials match 'zzzzz'");
+    }
+
+    #[test]
+    fn test_material_browser_search_glass() {
+        let results = filter_materials("glass");
+        let names: Vec<&str> = results.iter().map(|(_, n)| *n).collect();
+        assert!(names.contains(&"Glass"));
+        assert!(names.contains(&"Glass Shards"));
+        assert_eq!(names.len(), 2, "Only Glass and Glass Shards match");
+    }
+}
