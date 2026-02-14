@@ -20,6 +20,10 @@ pub struct InputState {
     /// Mouse position in CSS pixels.
     pub mouse_x: f32,
     pub mouse_y: f32,
+    /// Whether the pointer is currently locked (first-person mode).
+    pub pointer_locked: bool,
+    /// Set to true for one frame when pointer lock is lost (Escape pressed).
+    pub pointer_lock_lost: bool,
 }
 
 impl InputState {
@@ -36,6 +40,8 @@ impl InputState {
             shift_down: false,
             mouse_x: 0.0,
             mouse_y: 0.0,
+            pointer_locked: false,
+            pointer_lock_lost: false,
         }
     }
 
@@ -50,6 +56,7 @@ impl InputState {
         self.mouse_dy = 0.0;
         self.scroll_delta = 0.0;
         self.keys_just_pressed.clear();
+        self.pointer_lock_lost = false;
     }
 }
 
@@ -192,5 +199,46 @@ pub fn register_input_listeners(
             .add_event_listener_with_callback("keyup", closure.as_ref().unchecked_ref())
             .expect("failed to add keyup listener");
         closure.forget();
+    }
+
+    // pointerlockchange — track pointer lock state
+    {
+        let state = state.clone();
+        let doc: web_sys::EventTarget = web_sys::window()
+            .expect("no global window")
+            .document()
+            .expect("no document")
+            .into();
+        let closure = Closure::<dyn FnMut()>::new(move || {
+            let document = web_sys::window()
+                .expect("no global window")
+                .document()
+                .expect("no document");
+            let locked = document.pointer_lock_element().is_some();
+            let mut s = state.borrow_mut();
+            if s.pointer_locked && !locked {
+                s.pointer_lock_lost = true;
+            }
+            s.pointer_locked = locked;
+        });
+        doc.add_event_listener_with_callback("pointerlockchange", closure.as_ref().unchecked_ref())
+            .expect("failed to add pointerlockchange listener");
+        closure.forget();
+    }
+}
+
+/// Request pointer lock on the canvas element (for first-person camera).
+pub fn request_pointer_lock() {
+    if let Some(document) = web_sys::window().and_then(|w| w.document()) {
+        if let Some(canvas) = document.get_element_by_id("alkahest-canvas") {
+            canvas.request_pointer_lock();
+        }
+    }
+}
+
+/// Release pointer lock (back to orbit camera).
+pub fn exit_pointer_lock() {
+    if let Some(document) = web_sys::window().and_then(|w| w.document()) {
+        document.exit_pointer_lock();
     }
 }

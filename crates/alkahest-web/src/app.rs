@@ -536,16 +536,27 @@ impl Application {
             // Tab key: toggle camera mode (orbit ↔ first-person)
             if input.was_just_pressed("Tab") {
                 camera.toggle_mode();
-                let mode_name = match camera.mode {
-                    crate::camera::CameraMode::Orbit => "Orbit",
-                    crate::camera::CameraMode::FirstPerson => "First-Person",
-                };
-                log::info!("Camera: {}", mode_name);
+                match camera.mode {
+                    crate::camera::CameraMode::Orbit => {
+                        crate::input::exit_pointer_lock();
+                        log::info!("Camera: Orbit");
+                    }
+                    crate::camera::CameraMode::FirstPerson => {
+                        crate::input::request_pointer_lock();
+                        log::info!("Camera: First-Person");
+                    }
+                }
             }
 
             // ? or F1: toggle help overlay
             if input.was_just_pressed("?") || input.was_just_pressed("F1") {
                 *help_open = !*help_open;
+            }
+
+            // Revert to orbit if pointer lock was lost while in FP mode (e.g. user pressed Escape)
+            if camera.mode == crate::camera::CameraMode::FirstPerson && input.pointer_lock_lost {
+                camera.toggle_mode();
+                log::info!("Camera: Orbit (pointer lock lost)");
             }
 
             // Check if egui wants pointer input — if so, suppress camera controls
