@@ -1,7 +1,6 @@
 use alkahest_core::constants::CHUNK_SIZE;
 
 /// Create the reaction compute pipeline.
-/// Workgroup is 8x8x4 = 256. Chunk is 32x32x32. Dispatch is 4x4x8 workgroups.
 pub fn create_reaction_pipeline(
     device: &wgpu::Device,
     bind_group_layout: &wgpu::BindGroupLayout,
@@ -28,14 +27,19 @@ pub fn create_reaction_pipeline(
     })
 }
 
-/// Dispatch the reactions pass over the full chunk.
-/// Workgroup is 8x8x4, chunk is 32x32x32, so dispatch (4, 4, 8) workgroups.
+/// Dispatch the reactions pass over all active chunks.
+/// Workgroup is 8x8x4, dispatch z = active_chunk_count * (CHUNK_SIZE / 4).
 pub fn dispatch_reactions(
     pass: &mut wgpu::ComputePass,
     pipeline: &wgpu::ComputePipeline,
     bind_group: &wgpu::BindGroup,
+    active_chunk_count: u32,
 ) {
     pass.set_pipeline(pipeline);
     pass.set_bind_group(0, bind_group, &[]);
-    pass.dispatch_workgroups(CHUNK_SIZE / 8, CHUNK_SIZE / 8, CHUNK_SIZE / 4);
+    pass.dispatch_workgroups(
+        CHUNK_SIZE / 8,
+        CHUNK_SIZE / 8,
+        active_chunk_count * (CHUNK_SIZE / 4),
+    );
 }

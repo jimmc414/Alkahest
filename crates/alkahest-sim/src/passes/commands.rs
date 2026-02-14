@@ -10,13 +10,13 @@ pub struct SimCommand {
     pub pos_y: i32,
     pub pos_z: i32,
     pub material_id: u32,
-    pub _pad0: u32,
+    pub chunk_dispatch_idx: u32,
     pub _pad1: u32,
     pub _pad2: u32,
 }
 
 /// Tool type constants matching the shader.
-#[allow(dead_code)] // Used by web crate via SimCommand.tool_type values
+#[allow(dead_code)]
 pub const TOOL_PLACE: u32 = 1;
 #[allow(dead_code)]
 pub const TOOL_REMOVE: u32 = 2;
@@ -72,6 +72,5 @@ pub fn dispatch_commands(
     }
     pass.set_pipeline(pipeline);
     pass.set_bind_group(0, bind_group, &[]);
-    // One workgroup of 64 threads handles up to 64 commands
     pass.dispatch_workgroups(1, 1, 1);
 }
