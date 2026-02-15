@@ -110,32 +110,57 @@ mod tests {
 
     #[test]
     fn test_valid_materials_load() {
-        // Load all materials from embedded RON data (12 base + 4 M6)
+        // Load all materials from all category files
         let naturals = include_str!("../../../data/materials/naturals.ron");
         let organics = include_str!("../../../data/materials/organics.ron");
         let energy = include_str!("../../../data/materials/energy.ron");
         let explosives = include_str!("../../../data/materials/explosives.ron");
-        let table =
-            load_all_materials(&[naturals, organics, energy, explosives]).expect("should load");
-        assert_eq!(table.len(), 16);
+        let metals = include_str!("../../../data/materials/metals.ron");
+        let synthetics = include_str!("../../../data/materials/synthetics.ron");
+        let exotic = include_str!("../../../data/materials/exotic.ron");
+        let table = load_all_materials(&[
+            naturals, organics, energy, explosives, metals, synthetics, exotic,
+        ])
+        .expect("should load");
+        assert!(
+            table.len() >= 200,
+            "expected at least 200 materials, got {}",
+            table.len()
+        );
     }
 
     #[test]
     fn test_valid_rules_load() {
-        // Load all rules from embedded RON data (combustion + structural)
+        // Load all rules from all rule files
         let combustion = include_str!("../../../data/rules/combustion.ron");
         let structural = include_str!("../../../data/rules/structural.ron");
-        let set = load_all_rules(&[combustion, structural]).expect("should load");
+        let phase_change = include_str!("../../../data/rules/phase_change.ron");
+        let dissolution = include_str!("../../../data/rules/dissolution.ron");
+        let displacement = include_str!("../../../data/rules/displacement.ron");
+        let biological = include_str!("../../../data/rules/biological.ron");
+        let thermal = include_str!("../../../data/rules/thermal.ron");
+        let synthesis = include_str!("../../../data/rules/synthesis.ron");
+        let set = load_all_rules(&[
+            combustion,
+            structural,
+            phase_change,
+            dissolution,
+            displacement,
+            biological,
+            thermal,
+            synthesis,
+        ])
+        .expect("should load");
         assert!(
-            set.len() >= 17,
-            "expected at least 17 rules, got {}",
+            set.len() >= 500,
+            "expected at least 500 rules, got {}",
             set.len()
         );
     }
 
     #[test]
     fn test_new_materials_load() {
-        // M6: verify all 4 new materials parse correctly
+        // M6: verify all 4 explosive materials parse correctly
         let explosives = include_str!("../../../data/materials/explosives.ron");
         let table = load_materials_from_str(explosives).expect("should parse explosives.ron");
         assert_eq!(table.len(), 4);
@@ -159,18 +184,28 @@ mod tests {
 
     #[test]
     fn test_gunpowder_rule_loads() {
-        // M6: verify gunpowder combustion rules parse with pressure_delta
+        // Verify gunpowder combustion rules parse with pressure_delta
         let structural = include_str!("../../../data/rules/structural.ron");
         let set = load_rules_from_str(structural).expect("should parse structural.ron");
-        assert_eq!(set.len(), 2);
+        assert!(
+            set.len() >= 2,
+            "expected at least 2 structural rules, got {}",
+            set.len()
+        );
 
-        let fire_rule = &set.rules[0];
-        assert_eq!(fire_rule.name, "Gunpowder+Fire explosion");
+        let fire_rule = set
+            .rules
+            .iter()
+            .find(|r| r.name == "Gunpowder+Fire explosion")
+            .expect("Gunpowder+Fire explosion rule missing");
         assert_eq!(fire_rule.pressure_delta, 60);
         assert_eq!(fire_rule.temp_delta, 500);
 
-        let lava_rule = &set.rules[1];
-        assert_eq!(lava_rule.name, "Gunpowder+Lava explosion");
+        let lava_rule = set
+            .rules
+            .iter()
+            .find(|r| r.name == "Gunpowder+Lava explosion")
+            .expect("Gunpowder+Lava explosion rule missing");
         assert_eq!(lava_rule.pressure_delta, 55);
     }
 }
