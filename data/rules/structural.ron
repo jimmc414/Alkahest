@@ -1,5 +1,31 @@
 [
-    // === Gunpowder combustion ===
+    // =========================================================================
+    // === STRUCTURAL INTERACTION RULES ===
+    // =========================================================================
+    // Pairwise rules for explosions, structural failure, thermal shock,
+    // pressure containment, corrosion/weathering, and exotic material
+    // durability. Each (input_a, input_b) pair is unique across ALL rule files.
+    //
+    // Material ID quick reference (structural subset):
+    //   0:Air  1:Stone  2:Sand  3:Water  5:Fire  7:Steam  9:Ash
+    //   11:Lava  12:Gunpowder  13:Sealed-Metal  14:Glass  15:Glass Shards
+    //   16:Granite  17:Basalt  18:Limestone  19:Marble  20:Sandstone
+    //   27:Obsidian  31:Quartz  49:Volcanic Rock
+    //   50:Iron  51:Copper  54:Aluminum  66:Bronze  67:Brass  68:Steel
+    //   69:Stainless Steel  70:Cast Iron  71:Molten Iron  77:Rust  79:Slag
+    //   84:Wire  130:Plasma  132:Ember  136:Methane  137:Propane
+    //   138:Natural Gas  149:Magma  160:Napalm  162:Plasma Arc
+    //   163:Electric Arc  164:Inferno  166:Acid  170:Concrete  173:Brick
+    //   176:Ceramic  186:Firebrick  188:Reinforced Concrete  192:Carbon Fiber
+    //   193:Kevlar  207:Tempered Glass  208:Safety Glass  213:Neutronium
+    //   221:Antimatter  226:Dragon Scale  234:Mythril  235:Adamantine
+    // =========================================================================
+
+    // =========================================================================
+    // === GUNPOWDER EXPLOSIVE REACTIONS ===
+    // Gunpowder detonates on contact with ignition sources.
+    // =========================================================================
+
     // Gunpowder + Fire -> Air + Fire (explosive combustion with massive pressure)
     (
         name: "Gunpowder+Fire explosion",
@@ -21,5 +47,741 @@
         probability: 0.9,
         temp_delta: 400,
         pressure_delta: 55,
+    ),
+    // Gunpowder + Plasma Arc -> Air + Plasma Arc (arc detonates gunpowder)
+    (
+        name: "Gunpowder+PlasmaArc explosion",
+        input_a: 12,
+        input_b: 162,
+        output_a: 0,
+        output_b: 162,
+        probability: 1.0,
+        temp_delta: 500,
+        pressure_delta: 58,
+    ),
+    // Gunpowder + Plasma -> Air + Plasma (plasma instantly detonates)
+    (
+        name: "Gunpowder+Plasma explosion",
+        input_a: 12,
+        input_b: 130,
+        output_a: 0,
+        output_b: 130,
+        probability: 1.0,
+        temp_delta: 600,
+        pressure_delta: 60,
+    ),
+    // Gunpowder + Inferno -> Air + Inferno (inferno detonates gunpowder)
+    (
+        name: "Gunpowder+Inferno explosion",
+        input_a: 12,
+        input_b: 164,
+        output_a: 0,
+        output_b: 164,
+        probability: 1.0,
+        temp_delta: 500,
+        pressure_delta: 60,
+    ),
+
+    // =========================================================================
+    // === GAS IGNITION BY EMBER ===
+    // Flammable gases ignited by ember contact.
+    // Note: Ember+Methane, Ember+Propane, Ember+NaturalGas are in combustion.ron
+    // =========================================================================
+
+    // Methane + Plasma Arc -> Fire + Fire (plasma arc ignites methane)
+    (
+        name: "Methane+PlasmaArc detonation",
+        input_a: 136,
+        input_b: 162,
+        output_a: 5,
+        output_b: 5,
+        probability: 1.0,
+        temp_delta: 300,
+        pressure_delta: 35,
+    ),
+    // Propane + Plasma Arc -> Fire + Fire (plasma arc ignites propane)
+    (
+        name: "Propane+PlasmaArc detonation",
+        input_a: 137,
+        input_b: 162,
+        output_a: 5,
+        output_b: 5,
+        probability: 1.0,
+        temp_delta: 350,
+        pressure_delta: 40,
+    ),
+    // Natural Gas + Plasma Arc -> Fire + Fire (plasma arc ignites natural gas)
+    (
+        name: "NaturalGas+PlasmaArc detonation",
+        input_a: 138,
+        input_b: 162,
+        output_a: 5,
+        output_b: 5,
+        probability: 1.0,
+        temp_delta: 280,
+        pressure_delta: 30,
+    ),
+    // Methane + Electric Arc -> Fire + Fire (electric arc ignites methane)
+    (
+        name: "Methane+ElectricArc detonation",
+        input_a: 136,
+        input_b: 163,
+        output_a: 5,
+        output_b: 5,
+        probability: 0.9,
+        temp_delta: 280,
+        pressure_delta: 30,
+    ),
+    // Propane + Electric Arc -> Fire + Fire (electric arc ignites propane)
+    (
+        name: "Propane+ElectricArc detonation",
+        input_a: 137,
+        input_b: 163,
+        output_a: 5,
+        output_b: 5,
+        probability: 0.9,
+        temp_delta: 320,
+        pressure_delta: 35,
+    ),
+    // Natural Gas + Electric Arc -> Fire + Fire (electric arc ignites natural gas)
+    (
+        name: "NaturalGas+ElectricArc detonation",
+        input_a: 138,
+        input_b: 163,
+        output_a: 5,
+        output_b: 5,
+        probability: 0.85,
+        temp_delta: 260,
+        pressure_delta: 28,
+    ),
+
+    // =========================================================================
+    // === GLASS THERMAL SHOCK / STRUCTURAL FAILURE ===
+    // Glass shatters when exposed to extreme heat sources.
+    // =========================================================================
+
+    // Glass + Lava -> Glass Shards + Lava (thermal shock shatters glass)
+    (
+        name: "Glass+Lava thermal shock",
+        input_a: 14,
+        input_b: 11,
+        output_a: 15,
+        output_b: 11,
+        probability: 0.5,
+        temp_delta: -20,
+    ),
+    // Glass + Plasma -> Glass Shards + Plasma (plasma shatters glass)
+    (
+        name: "Glass+Plasma thermal shock",
+        input_a: 14,
+        input_b: 130,
+        output_a: 15,
+        output_b: 130,
+        probability: 0.7,
+        temp_delta: -30,
+    ),
+    // Tempered Glass + Lava -> Glass Shards + Lava (tempered resists better)
+    (
+        name: "TemperedGlass+Lava thermal shock",
+        input_a: 207,
+        input_b: 11,
+        output_a: 15,
+        output_b: 11,
+        probability: 0.3,
+        temp_delta: -15,
+    ),
+    // Tempered Glass + Plasma -> Glass Shards + Plasma
+    (
+        name: "TemperedGlass+Plasma thermal shock",
+        input_a: 207,
+        input_b: 130,
+        output_a: 15,
+        output_b: 130,
+        probability: 0.4,
+        temp_delta: -20,
+    ),
+    // Safety Glass + Lava -> Glass Shards + Lava (most resistant standard glass)
+    (
+        name: "SafetyGlass+Lava thermal shock",
+        input_a: 208,
+        input_b: 11,
+        output_a: 15,
+        output_b: 11,
+        probability: 0.2,
+        temp_delta: -10,
+    ),
+    // Safety Glass + Plasma -> Glass Shards + Plasma
+    (
+        name: "SafetyGlass+Plasma thermal shock",
+        input_a: 208,
+        input_b: 130,
+        output_a: 15,
+        output_b: 130,
+        probability: 0.3,
+        temp_delta: -15,
+    ),
+    // Tempered Glass + Magma -> Glass Shards + Magma
+    (
+        name: "TemperedGlass+Magma thermal shock",
+        input_a: 207,
+        input_b: 149,
+        output_a: 15,
+        output_b: 149,
+        probability: 0.4,
+        temp_delta: -20,
+    ),
+    // Safety Glass + Magma -> Glass Shards + Magma
+    (
+        name: "SafetyGlass+Magma thermal shock",
+        input_a: 208,
+        input_b: 149,
+        output_a: 15,
+        output_b: 149,
+        probability: 0.25,
+        temp_delta: -15,
+    ),
+
+    // =========================================================================
+    // === METAL STRUCTURAL FAILURE UNDER EXTREME HEAT ===
+    // Sealed containers and structural metals degrade under plasma/lava.
+    // =========================================================================
+
+    // Sealed-Metal + Plasma -> Iron + Plasma (plasma breaches containment)
+    (
+        name: "SealedMetal+Plasma breach",
+        input_a: 13,
+        input_b: 130,
+        output_a: 50,
+        output_b: 130,
+        probability: 0.3,
+        temp_delta: -30,
+    ),
+    // Cast Iron + Lava -> Molten Iron + Lava (cast iron melts)
+    (
+        name: "CastIron+Lava meltdown",
+        input_a: 70,
+        input_b: 11,
+        output_a: 71,
+        output_b: 11,
+        probability: 0.2,
+        min_temp: 700,
+    ),
+    // Cast Iron + Plasma -> Molten Iron + Plasma (plasma melts cast iron)
+    (
+        name: "CastIron+Plasma meltdown",
+        input_a: 70,
+        input_b: 130,
+        output_a: 71,
+        output_b: 130,
+        probability: 0.4,
+        temp_delta: -40,
+    ),
+    // Bronze + Plasma -> Molten Iron + Plasma (plasma melts bronze)
+    (
+        name: "Bronze+Plasma meltdown",
+        input_a: 66,
+        input_b: 130,
+        output_a: 71,
+        output_b: 130,
+        probability: 0.4,
+        temp_delta: -35,
+    ),
+    // Brass + Plasma -> Molten Iron + Plasma (plasma melts brass)
+    (
+        name: "Brass+Plasma meltdown",
+        input_a: 67,
+        input_b: 130,
+        output_a: 71,
+        output_b: 130,
+        probability: 0.45,
+        temp_delta: -30,
+    ),
+
+    // =========================================================================
+    // === CORROSION AND WEATHERING ===
+    // Slow structural degradation from environmental exposure.
+    // =========================================================================
+
+    // Rust + Water -> Rust + Rust (rust spreads in water, slow corrosion)
+    (
+        name: "Rust+Water spreading",
+        input_a: 77,
+        input_b: 3,
+        output_a: 77,
+        output_b: 77,
+        probability: 0.03,
+    ),
+    // Rust + Acid -> Air + Acid (acid dissolves rust completely)
+    (
+        name: "Rust+Acid dissolution",
+        input_a: 77,
+        input_b: 166,
+        output_a: 0,
+        output_b: 166,
+        probability: 0.2,
+    ),
+    // Aluminum + Plasma -> Slag + Plasma (aluminum vaporizes under plasma)
+    (
+        name: "Aluminum+Plasma structural melt",
+        input_a: 54,
+        input_b: 130,
+        output_a: 79,
+        output_b: 130,
+        probability: 0.5,
+        temp_delta: -25,
+    ),
+
+    // =========================================================================
+    // === BUILDING MATERIAL STRUCTURAL FAILURE ===
+    // Concrete, brick, and reinforced materials under extreme forces.
+    // =========================================================================
+
+    // Brick + Lava -> Slag + Lava (brick decomposes under extreme heat)
+    (
+        name: "Brick+Lava decomposition",
+        input_a: 173,
+        input_b: 11,
+        output_a: 79,
+        output_b: 11,
+        probability: 0.15,
+        min_temp: 700,
+    ),
+    // Concrete + Plasma -> Slag + Plasma (plasma destroys concrete)
+    (
+        name: "Concrete+Plasma destruction",
+        input_a: 170,
+        input_b: 130,
+        output_a: 79,
+        output_b: 130,
+        probability: 0.3,
+        temp_delta: -40,
+    ),
+    // Brick + Plasma -> Slag + Plasma (plasma destroys brick)
+    (
+        name: "Brick+Plasma destruction",
+        input_a: 173,
+        input_b: 130,
+        output_a: 79,
+        output_b: 130,
+        probability: 0.35,
+        temp_delta: -35,
+    ),
+    // Reinforced Concrete + Lava -> Concrete + Lava (rebar weakens first)
+    (
+        name: "ReinforcedConcrete+Lava degradation",
+        input_a: 188,
+        input_b: 11,
+        output_a: 170,
+        output_b: 11,
+        probability: 0.05,
+        min_temp: 900,
+    ),
+    // Reinforced Concrete + Plasma -> Slag + Plasma (plasma destroys reinforced)
+    (
+        name: "ReinforcedConcrete+Plasma destruction",
+        input_a: 188,
+        input_b: 130,
+        output_a: 79,
+        output_b: 130,
+        probability: 0.15,
+        temp_delta: -50,
+    ),
+    // Firebrick + Plasma -> Slag + Plasma (firebrick is very heat resistant)
+    (
+        name: "Firebrick+Plasma destruction",
+        input_a: 186,
+        input_b: 130,
+        output_a: 79,
+        output_b: 130,
+        probability: 0.1,
+        temp_delta: -30,
+    ),
+    // Carbon Fiber + Lava -> Ash + Lava (carbon fiber burns away at extreme temp)
+    (
+        name: "CarbonFiber+Lava incineration",
+        input_a: 192,
+        input_b: 11,
+        output_a: 9,
+        output_b: 11,
+        probability: 0.2,
+        min_temp: 800,
+    ),
+    // Carbon Fiber + Plasma -> Ash + Plasma (plasma incinerates carbon fiber)
+    (
+        name: "CarbonFiber+Plasma incineration",
+        input_a: 192,
+        input_b: 130,
+        output_a: 9,
+        output_b: 130,
+        probability: 0.4,
+        temp_delta: -30,
+    ),
+    // Kevlar + Lava -> Ash + Lava (kevlar melts and burns)
+    (
+        name: "Kevlar+Lava incineration",
+        input_a: 193,
+        input_b: 11,
+        output_a: 9,
+        output_b: 11,
+        probability: 0.15,
+        min_temp: 700,
+    ),
+    // Kevlar + Plasma -> Ash + Plasma (plasma destroys kevlar)
+    (
+        name: "Kevlar+Plasma incineration",
+        input_a: 193,
+        input_b: 130,
+        output_a: 9,
+        output_b: 130,
+        probability: 0.35,
+        temp_delta: -25,
+    ),
+
+    // =========================================================================
+    // === STONE AND ROCK STRUCTURAL FAILURE ===
+    // Plasma destroys stone materials. Lava interactions that transform
+    // materials (not just thermal conduction) belong here.
+    // Note: Lava+stone thermal conduction rules are in thermal.ron.
+    // =========================================================================
+
+    // Granite + Plasma -> Slag + Plasma (plasma melts granite)
+    (
+        name: "Granite+Plasma destruction",
+        input_a: 16,
+        input_b: 130,
+        output_a: 79,
+        output_b: 130,
+        probability: 0.25,
+        temp_delta: -40,
+    ),
+    // Basalt + Plasma -> Slag + Plasma (plasma melts basalt)
+    (
+        name: "Basalt+Plasma destruction",
+        input_a: 17,
+        input_b: 130,
+        output_a: 79,
+        output_b: 130,
+        probability: 0.25,
+        temp_delta: -40,
+    ),
+    // Limestone + Plasma -> Slag + Plasma (plasma vitrifies limestone)
+    (
+        name: "Limestone+Plasma destruction",
+        input_a: 18,
+        input_b: 130,
+        output_a: 79,
+        output_b: 130,
+        probability: 0.35,
+        temp_delta: -35,
+    ),
+    // Marble + Plasma -> Slag + Plasma (marble decomposes under plasma)
+    (
+        name: "Marble+Plasma destruction",
+        input_a: 19,
+        input_b: 130,
+        output_a: 79,
+        output_b: 130,
+        probability: 0.3,
+        temp_delta: -35,
+    ),
+    // Sandstone + Plasma -> Slag + Plasma (plasma vitrifies sandstone)
+    (
+        name: "Sandstone+Plasma destruction",
+        input_a: 20,
+        input_b: 130,
+        output_a: 79,
+        output_b: 130,
+        probability: 0.35,
+        temp_delta: -30,
+    ),
+    // Obsidian + Plasma -> Slag + Plasma (even obsidian yields to plasma)
+    (
+        name: "Obsidian+Plasma destruction",
+        input_a: 27,
+        input_b: 130,
+        output_a: 79,
+        output_b: 130,
+        probability: 0.2,
+        temp_delta: -45,
+    ),
+    // Quartz + Plasma -> Glass + Plasma (quartz vitrifies into glass)
+    (
+        name: "Quartz+Plasma vitrification",
+        input_a: 31,
+        input_b: 130,
+        output_a: 14,
+        output_b: 130,
+        probability: 0.3,
+        temp_delta: -35,
+    ),
+    // Volcanic Rock + Plasma -> Slag + Plasma (volcanic rock melts)
+    (
+        name: "VolcanicRock+Plasma destruction",
+        input_a: 49,
+        input_b: 130,
+        output_a: 79,
+        output_b: 130,
+        probability: 0.25,
+        temp_delta: -40,
+    ),
+
+    // =========================================================================
+    // === EXOTIC MATERIAL STRUCTURAL TESTS ===
+    // Indestructible and legendary materials resist even extreme forces.
+    // =========================================================================
+
+    // Neutronium + Plasma -> Neutronium + Plasma (indestructible)
+    (
+        name: "Neutronium+Plasma indestructible",
+        input_a: 213,
+        input_b: 130,
+        output_a: 213,
+        output_b: 130,
+        probability: 0.0,
+    ),
+    // Dragon Scale + Lava -> Dragon Scale + Lava (fireproof)
+    (
+        name: "DragonScale+Lava fireproof",
+        input_a: 226,
+        input_b: 11,
+        output_a: 226,
+        output_b: 11,
+        probability: 0.0,
+    ),
+    // Adamantine + Plasma -> Adamantine + Plasma (indestructible)
+    (
+        name: "Adamantine+Plasma indestructible",
+        input_a: 235,
+        input_b: 130,
+        output_a: 235,
+        output_b: 130,
+        probability: 0.0,
+    ),
+    // Mythril + Lava -> Mythril + Lava (heat resistant)
+    (
+        name: "Mythril+Lava heatproof",
+        input_a: 234,
+        input_b: 11,
+        output_a: 234,
+        output_b: 11,
+        probability: 0.0,
+    ),
+    // Mythril + Plasma -> Mythril + Plasma (resists even plasma)
+    (
+        name: "Mythril+Plasma resistant",
+        input_a: 234,
+        input_b: 130,
+        output_a: 234,
+        output_b: 130,
+        probability: 0.0,
+    ),
+    // Dragon Scale + Plasma -> Dragon Scale + Plasma (resists plasma)
+    (
+        name: "DragonScale+Plasma resistant",
+        input_a: 226,
+        input_b: 130,
+        output_a: 226,
+        output_b: 130,
+        probability: 0.0,
+    ),
+    // Adamantine + Lava -> Adamantine + Lava (resists lava)
+    (
+        name: "Adamantine+Lava resistant",
+        input_a: 235,
+        input_b: 11,
+        output_a: 235,
+        output_b: 11,
+        probability: 0.0,
+    ),
+    // Neutronium + Lava -> Neutronium + Lava (indestructible)
+    (
+        name: "Neutronium+Lava indestructible",
+        input_a: 213,
+        input_b: 11,
+        output_a: 213,
+        output_b: 11,
+        probability: 0.0,
+    ),
+
+    // =========================================================================
+    // === ANTIMATTER STRUCTURAL ANNIHILATION ===
+    // Antimatter annihilates anything it contacts.
+    // Note: Antimatter+Water, +Stone, +Iron, +Sand, +Gold, +Lava, +Ice are
+    //       in displacement.ron. These cover structural materials.
+    // =========================================================================
+
+    // Antimatter + Sealed-Metal -> Air + Air (total annihilation)
+    (
+        name: "Antimatter+SealedMetal annihilation",
+        input_a: 221,
+        input_b: 13,
+        output_a: 0,
+        output_b: 0,
+        probability: 1.0,
+        temp_delta: 800,
+        pressure_delta: 63,
+    ),
+    // Antimatter + Concrete -> Air + Air (annihilation)
+    (
+        name: "Antimatter+Concrete annihilation",
+        input_a: 221,
+        input_b: 170,
+        output_a: 0,
+        output_b: 0,
+        probability: 1.0,
+        temp_delta: 650,
+        pressure_delta: 50,
+    ),
+    // Antimatter + Steel -> Air + Air (annihilation)
+    (
+        name: "Antimatter+Steel annihilation",
+        input_a: 221,
+        input_b: 68,
+        output_a: 0,
+        output_b: 0,
+        probability: 1.0,
+        temp_delta: 750,
+        pressure_delta: 55,
+    ),
+
+    // =========================================================================
+    // === NAPALM AND ARC STRUCTURAL INTERACTIONS ===
+    // Sustained heat sources degrade structural materials.
+    // =========================================================================
+
+    // Napalm + Sealed-Metal -> Napalm + Iron (napalm melts containment seal)
+    (
+        name: "Napalm+SealedMetal breach",
+        input_a: 160,
+        input_b: 13,
+        output_a: 160,
+        output_b: 50,
+        probability: 0.1,
+        min_temp: 500,
+    ),
+    // Plasma Arc + Iron -> Plasma Arc + Molten Iron (arc cutting)
+    (
+        name: "PlasmaArc+Iron cutting",
+        input_a: 162,
+        input_b: 50,
+        output_a: 162,
+        output_b: 71,
+        probability: 0.5,
+        temp_delta: -40,
+    ),
+    // Electric Arc + Iron -> Electric Arc + Molten Iron (arc welding)
+    (
+        name: "ElectricArc+Iron cutting",
+        input_a: 163,
+        input_b: 50,
+        output_a: 163,
+        output_b: 71,
+        probability: 0.4,
+        temp_delta: -35,
+    ),
+    // Plasma Arc + Concrete -> Plasma Arc + Slag (arc destroys concrete)
+    (
+        name: "PlasmaArc+Concrete destruction",
+        input_a: 162,
+        input_b: 170,
+        output_a: 162,
+        output_b: 79,
+        probability: 0.4,
+        temp_delta: -30,
+    ),
+    // Electric Arc + Glass -> Electric Arc + Glass Shards (arc shatters glass)
+    (
+        name: "ElectricArc+Glass shatter",
+        input_a: 163,
+        input_b: 14,
+        output_a: 163,
+        output_b: 15,
+        probability: 0.6,
+        temp_delta: -20,
+    ),
+    // Plasma Arc + Steel -> Plasma Arc + Molten Iron (arc cuts through steel)
+    (
+        name: "PlasmaArc+Steel cutting",
+        input_a: 162,
+        input_b: 68,
+        output_a: 162,
+        output_b: 71,
+        probability: 0.35,
+        temp_delta: -50,
+    ),
+    // Electric Arc + Steel -> Electric Arc + Molten Iron (arc welds/cuts steel)
+    (
+        name: "ElectricArc+Steel cutting",
+        input_a: 163,
+        input_b: 68,
+        output_a: 163,
+        output_b: 71,
+        probability: 0.3,
+        temp_delta: -45,
+    ),
+    // Plasma Arc + Copper -> Plasma Arc + Slag (arc destroys copper)
+    (
+        name: "PlasmaArc+Copper cutting",
+        input_a: 162,
+        input_b: 51,
+        output_a: 162,
+        output_b: 79,
+        probability: 0.45,
+        temp_delta: -35,
+    ),
+    // Electric Arc + Wire -> Electric Arc + Slag (arc melts thin wire)
+    (
+        name: "ElectricArc+Wire melt",
+        input_a: 163,
+        input_b: 84,
+        output_a: 163,
+        output_b: 79,
+        probability: 0.5,
+        temp_delta: -25,
+    ),
+    // Plasma Arc + Aluminum -> Plasma Arc + Slag (aluminum melts quickly)
+    (
+        name: "PlasmaArc+Aluminum cutting",
+        input_a: 162,
+        input_b: 54,
+        output_a: 162,
+        output_b: 79,
+        probability: 0.55,
+        temp_delta: -30,
+    ),
+    // Inferno + Sealed-Metal -> Inferno + Iron (inferno degrades seal)
+    (
+        name: "Inferno+SealedMetal breach",
+        input_a: 164,
+        input_b: 13,
+        output_a: 164,
+        output_b: 50,
+        probability: 0.08,
+        min_temp: 600,
+    ),
+
+    // =========================================================================
+    // === STAINLESS STEEL RESISTANCE ===
+    // Stainless steel resists most damage but yields to plasma.
+    // =========================================================================
+
+    // Stainless Steel + Magma -> Stainless Steel + Magma (resists even magma)
+    (
+        name: "StainlessSteel+Magma resistant",
+        input_a: 69,
+        input_b: 149,
+        output_a: 69,
+        output_b: 149,
+        probability: 0.0,
+    ),
+    // Stainless Steel + Plasma -> Molten Iron + Plasma (only plasma breaches it)
+    (
+        name: "StainlessSteel+Plasma meltdown",
+        input_a: 69,
+        input_b: 130,
+        output_a: 71,
+        output_b: 130,
+        probability: 0.2,
+        temp_delta: -50,
     ),
 ]

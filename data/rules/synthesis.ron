@@ -1,0 +1,828 @@
+[
+    // ============================================================================
+    // Synthesis / Crafting Interaction Rules
+    // ============================================================================
+    // Covers: alloy creation, ore smelting with fuel, construction material
+    // synthesis, ceramic/glass crafting, organic synthesis, fuel processing,
+    // rust reclamation, asphalt mixing, epoxy/resin, and exotic transmutation.
+    // ============================================================================
+
+    // === Alloy Creation (solid metals, require high min_temp) ==================
+
+    // Copper + Tin -> Bronze (classic bronze alloy)
+    (
+        name: "Copper+Tin makes Bronze",
+        input_a: 51,
+        input_b: 55,
+        output_a: 66,
+        output_b: 66,
+        probability: 0.3,
+        min_temp: 400,
+    ),
+    // Copper + Zinc -> Brass
+    (
+        name: "Copper+Zinc makes Brass",
+        input_a: 51,
+        input_b: 57,
+        output_a: 67,
+        output_b: 67,
+        probability: 0.3,
+        min_temp: 400,
+    ),
+    // Iron + Carbon -> Steel
+    (
+        name: "Iron+Carbon makes Steel",
+        input_a: 50,
+        input_b: 41,
+        output_a: 68,
+        output_b: 68,
+        probability: 0.2,
+        min_temp: 600,
+    ),
+    // Steel + Chromium -> Stainless Steel
+    (
+        name: "Steel+Chromium makes Stainless Steel",
+        input_a: 68,
+        input_b: 61,
+        output_a: 69,
+        output_b: 69,
+        probability: 0.15,
+        min_temp: 700,
+    ),
+    // Iron + Coal -> Cast Iron + Ash
+    (
+        name: "Iron+Coal makes Cast Iron",
+        input_a: 50,
+        input_b: 106,
+        output_a: 70,
+        output_b: 9,
+        probability: 0.2,
+        min_temp: 500,
+    ),
+    // Tin + Lead -> Solder
+    (
+        name: "Tin+Lead makes Solder",
+        input_a: 55,
+        input_b: 56,
+        output_a: 76,
+        output_b: 76,
+        probability: 0.3,
+        min_temp: 300,
+    ),
+    // Iron + Tungsten -> Alloy (tungsten-iron high-performance alloy)
+    (
+        name: "Iron+Tungsten makes Alloy",
+        input_a: 50,
+        input_b: 60,
+        output_a: 87,
+        output_b: 87,
+        probability: 0.15,
+        min_temp: 800,
+    ),
+    // Iron + Nickel -> Alloy (nickel-iron alloy, solid-state)
+    (
+        name: "Iron+Nickel makes Alloy",
+        input_a: 50,
+        input_b: 58,
+        output_a: 87,
+        output_b: 87,
+        probability: 0.15,
+        min_temp: 700,
+    ),
+
+    // === Molten Alloy Creation (molten metal + additive -> alloy + slag) =======
+
+    // Molten Iron + Carbon -> Steel + Slag
+    (
+        name: "Molten Iron+Carbon makes Steel",
+        input_a: 71,
+        input_b: 41,
+        output_a: 68,
+        output_b: 79,
+        probability: 0.4,
+    ),
+    // Molten Copper + Tin -> Bronze + Slag
+    (
+        name: "Molten Copper+Tin makes Bronze",
+        input_a: 72,
+        input_b: 55,
+        output_a: 66,
+        output_b: 79,
+        probability: 0.5,
+    ),
+    // Molten Copper + Zinc -> Brass + Slag
+    (
+        name: "Molten Copper+Zinc makes Brass",
+        input_a: 72,
+        input_b: 57,
+        output_a: 67,
+        output_b: 79,
+        probability: 0.5,
+    ),
+    // Molten Iron + Coal -> Cast Iron + Slag
+    (
+        name: "Molten Iron+Coal makes Cast Iron",
+        input_a: 71,
+        input_b: 106,
+        output_a: 70,
+        output_b: 79,
+        probability: 0.4,
+    ),
+    // Molten Iron + Chromium -> Stainless Steel + Slag
+    (
+        name: "Molten Iron+Chromium makes Stainless Steel",
+        input_a: 71,
+        input_b: 61,
+        output_a: 69,
+        output_b: 79,
+        probability: 0.3,
+    ),
+    // Molten Iron + Tungsten -> Alloy + Slag (high-temp alloy via molten base)
+    (
+        name: "Molten Iron+Tungsten makes Alloy",
+        input_a: 71,
+        input_b: 60,
+        output_a: 87,
+        output_b: 79,
+        probability: 0.3,
+    ),
+    // Molten Iron + Nickel -> Alloy + Slag (nickel-iron alloy)
+    (
+        name: "Molten Iron+Nickel makes Alloy",
+        input_a: 71,
+        input_b: 58,
+        output_a: 87,
+        output_b: 79,
+        probability: 0.3,
+    ),
+    // Molten Copper + Gold -> Alloy + Slag (decorative copper-gold)
+    (
+        name: "Molten Copper+Gold makes Alloy",
+        input_a: 72,
+        input_b: 52,
+        output_a: 87,
+        output_b: 79,
+        probability: 0.25,
+    ),
+    // Molten Copper + Silver -> Alloy + Slag (sterling copper-silver)
+    (
+        name: "Molten Copper+Silver makes Alloy",
+        input_a: 72,
+        input_b: 53,
+        output_a: 87,
+        output_b: 79,
+        probability: 0.25,
+    ),
+    // Molten Aluminum + Copper -> Alloy + Slag (aluminum-copper alloy)
+    (
+        name: "Molten Aluminum+Copper makes Alloy",
+        input_a: 75,
+        input_b: 51,
+        output_a: 87,
+        output_b: 79,
+        probability: 0.3,
+    ),
+    // Molten Iron + Cobalt -> Alloy + Slag (cobalt-iron alloy)
+    (
+        name: "Molten Iron+Cobalt makes Alloy",
+        input_a: 71,
+        input_b: 62,
+        output_a: 87,
+        output_b: 79,
+        probability: 0.3,
+    ),
+
+    // === Ore Smelting (ore + solid fuel -> metal + slag at high temp) ==========
+
+    // Iron Ore + Charcoal -> Iron + Slag
+    (
+        name: "Iron Ore+Charcoal smelting",
+        input_a: 80,
+        input_b: 105,
+        output_a: 50,
+        output_b: 79,
+        probability: 0.2,
+        min_temp: 500,
+    ),
+    // Iron Ore + Coal -> Iron + Slag
+    (
+        name: "Iron Ore+Coal smelting",
+        input_a: 80,
+        input_b: 106,
+        output_a: 50,
+        output_b: 79,
+        probability: 0.25,
+        min_temp: 500,
+    ),
+    // Iron Ore + Coke -> Iron + Slag (coke is the best reducing agent)
+    (
+        name: "Iron Ore+Coke smelting",
+        input_a: 80,
+        input_b: 168,
+        output_a: 50,
+        output_b: 79,
+        probability: 0.3,
+        min_temp: 500,
+    ),
+
+    // === Construction Material Synthesis =======================================
+
+    // Limestone + Clay -> Cement + Air (calcination and mixing)
+    (
+        name: "Limestone+Clay makes Cement",
+        input_a: 18,
+        input_b: 21,
+        output_a: 171,
+        output_b: 0,
+        probability: 0.15,
+        min_temp: 500,
+    ),
+    // Cement + Sand -> Concrete + Air (dry mix, sets on contact)
+    (
+        name: "Cement+Sand makes Concrete",
+        input_a: 171,
+        input_b: 2,
+        output_a: 170,
+        output_b: 0,
+        probability: 0.2,
+    ),
+    // Cement + Water -> Mortar + Air (wet mix, hydraulic set)
+    (
+        name: "Cement+Water makes Mortar",
+        input_a: 171,
+        input_b: 3,
+        output_a: 172,
+        output_b: 0,
+        probability: 0.3,
+    ),
+    // Clay + Sand -> Brick + Air (fired clay-sand mixture)
+    (
+        name: "Clay+Sand makes Brick",
+        input_a: 21,
+        input_b: 2,
+        output_a: 173,
+        output_b: 0,
+        probability: 0.1,
+        min_temp: 400,
+    ),
+    // Sand + Limestone -> Mortar + Air (lime mortar, traditional recipe)
+    (
+        name: "Sand+Limestone makes Mortar",
+        input_a: 2,
+        input_b: 18,
+        output_a: 172,
+        output_b: 0,
+        probability: 0.1,
+        min_temp: 400,
+    ),
+    // Gravel + Cement -> Concrete + Air (aggregate concrete)
+    (
+        name: "Gravel+Cement makes Concrete",
+        input_a: 22,
+        input_b: 171,
+        output_a: 170,
+        output_b: 0,
+        probability: 0.2,
+    ),
+    // Concrete + Iron -> Reinforced Concrete + Air
+    (
+        name: "Concrete+Iron makes Reinforced Concrete",
+        input_a: 170,
+        input_b: 50,
+        output_a: 188,
+        output_b: 0,
+        probability: 0.15,
+    ),
+    // Concrete + Steel -> Reinforced Concrete + Air
+    (
+        name: "Concrete+Steel makes Reinforced Concrete",
+        input_a: 170,
+        input_b: 68,
+        output_a: 188,
+        output_b: 0,
+        probability: 0.2,
+    ),
+    // Calcium + Sand -> Plaster + Air (calcium-sand plaster)
+    (
+        name: "Calcium+Sand makes Plaster",
+        input_a: 38,
+        input_b: 2,
+        output_a: 190,
+        output_b: 0,
+        probability: 0.1,
+    ),
+    // Limestone + Charcoal -> Calcium + Smoke (lime kiln reduction)
+    (
+        name: "Limestone+Charcoal makes Calcium",
+        input_a: 18,
+        input_b: 105,
+        output_a: 38,
+        output_b: 6,
+        probability: 0.15,
+        min_temp: 500,
+    ),
+
+    // === Ceramic Synthesis ====================================================
+
+    // Clay + Charcoal -> Ceramic + Ash (kiln firing with fuel)
+    (
+        name: "Clay+Charcoal makes Ceramic",
+        input_a: 21,
+        input_b: 105,
+        output_a: 176,
+        output_b: 9,
+        probability: 0.15,
+        min_temp: 400,
+    ),
+    // Clay + Coal -> Ceramic + Ash (kiln firing with coal fuel)
+    (
+        name: "Clay+Coal makes Ceramic",
+        input_a: 21,
+        input_b: 106,
+        output_a: 176,
+        output_b: 9,
+        probability: 0.15,
+        min_temp: 450,
+    ),
+    // Ceramic + Iron -> Firebrick + Iron (iron-reinforced refractory)
+    (
+        name: "Ceramic+Iron makes Firebrick",
+        input_a: 176,
+        input_b: 50,
+        output_a: 186,
+        output_b: 50,
+        probability: 0.1,
+        min_temp: 600,
+    ),
+    // Clay + Limestone Dust -> Tile + Air (lime-clay tile)
+    (
+        name: "Clay+Limestone Dust makes Tile",
+        input_a: 21,
+        input_b: 48,
+        output_a: 174,
+        output_b: 0,
+        probability: 0.1,
+        min_temp: 400,
+    ),
+    // Clay + Quartz -> Porcelain + Air (high-fire porcelain)
+    (
+        name: "Clay+Quartz makes Porcelain",
+        input_a: 21,
+        input_b: 31,
+        output_a: 175,
+        output_b: 0,
+        probability: 0.1,
+        min_temp: 600,
+    ),
+
+    // === Glass Synthesis =====================================================
+
+    // Sand + Charcoal -> Glass + Ash (charcoal-fired glassmaking)
+    (
+        name: "Sand+Charcoal makes Glass",
+        input_a: 2,
+        input_b: 105,
+        output_a: 14,
+        output_b: 9,
+        probability: 0.1,
+        min_temp: 700,
+    ),
+    // Sand + Coal -> Glass + Ash (coal-fired glassmaking)
+    (
+        name: "Sand+Coal makes Glass",
+        input_a: 2,
+        input_b: 106,
+        output_a: 14,
+        output_b: 9,
+        probability: 0.1,
+        min_temp: 700,
+    ),
+    // Silicon + Sand -> Glass + Glass (pure silicon glass synthesis)
+    (
+        name: "Silicon+Sand makes Glass",
+        input_a: 42,
+        input_b: 2,
+        output_a: 14,
+        output_b: 14,
+        probability: 0.15,
+        min_temp: 800,
+    ),
+
+    // === Organic Synthesis ===================================================
+
+    // Sawdust + Resin -> Epoxy + Air (resin-bonded composite)
+    (
+        name: "Sawdust+Resin makes Epoxy",
+        input_a: 111,
+        input_b: 103,
+        output_a: 195,
+        output_b: 0,
+        probability: 0.1,
+    ),
+    // Cotton + Wax -> Cloth + Air (waxed cotton cloth)
+    (
+        name: "Cotton+Wax makes Cloth",
+        input_a: 120,
+        input_b: 100,
+        output_a: 95,
+        output_b: 0,
+        probability: 0.1,
+    ),
+    // Fat + Ash -> Soap + Air (saponification)
+    (
+        name: "Fat+Ash makes Soap",
+        input_a: 101,
+        input_b: 9,
+        output_a: 127,
+        output_b: 0,
+        probability: 0.1,
+    ),
+    // Plant Fiber + Plant Fiber -> Rope + Air (fiber twisting)
+    (
+        name: "Plant Fiber+Plant Fiber makes Rope",
+        input_a: 118,
+        input_b: 118,
+        output_a: 96,
+        output_b: 0,
+        probability: 0.1,
+    ),
+    // Cotton + Cotton -> Cloth + Air (weaving)
+    (
+        name: "Cotton+Cotton makes Cloth",
+        input_a: 120,
+        input_b: 120,
+        output_a: 95,
+        output_b: 0,
+        probability: 0.08,
+    ),
+    // Tallow + Ash -> Soap + Air (tallow saponification)
+    (
+        name: "Tallow+Ash makes Soap",
+        input_a: 102,
+        input_b: 9,
+        output_a: 127,
+        output_b: 0,
+        probability: 0.1,
+    ),
+    // Bark + Bark -> Cork + Air (bark compression)
+    (
+        name: "Bark+Bark makes Cork",
+        input_a: 110,
+        input_b: 110,
+        output_a: 93,
+        output_b: 0,
+        probability: 0.05,
+    ),
+    // Silk + Silk -> Cloth + Air (silk weaving)
+    (
+        name: "Silk+Silk makes Cloth",
+        input_a: 119,
+        input_b: 119,
+        output_a: 95,
+        output_b: 0,
+        probability: 0.08,
+    ),
+    // Honey + Water -> Alcohol + Air (mead fermentation)
+    (
+        name: "Honey+Water fermentation",
+        input_a: 121,
+        input_b: 3,
+        output_a: 123,
+        output_b: 0,
+        probability: 0.02,
+    ),
+    // Plant Fiber + Wax -> Parchment + Air (waxed fiber sheet)
+    (
+        name: "Plant Fiber+Wax makes Parchment",
+        input_a: 118,
+        input_b: 100,
+        output_a: 128,
+        output_b: 0,
+        probability: 0.08,
+    ),
+
+    // === Fuel Processing =====================================================
+
+    // Charcoal + Charcoal -> Carbon + Ash (charcoal to pure carbon)
+    (
+        name: "Charcoal+Charcoal makes Carbon",
+        input_a: 105,
+        input_b: 105,
+        output_a: 41,
+        output_b: 9,
+        probability: 0.05,
+        min_temp: 600,
+    ),
+    // Coke + Coke -> Carbon + Ash (coke to pure carbon)
+    (
+        name: "Coke+Coke makes Carbon",
+        input_a: 168,
+        input_b: 168,
+        output_a: 41,
+        output_b: 9,
+        probability: 0.05,
+        min_temp: 700,
+    ),
+
+    // === Rust Reclamation ====================================================
+
+    // Rust + Charcoal -> Iron + Smoke (reduction smelting)
+    (
+        name: "Rust+Charcoal reduction",
+        input_a: 77,
+        input_b: 105,
+        output_a: 50,
+        output_b: 6,
+        probability: 0.1,
+        min_temp: 500,
+    ),
+    // Rust + Coal -> Iron + Smoke (coal reduction)
+    (
+        name: "Rust+Coal reduction",
+        input_a: 77,
+        input_b: 106,
+        output_a: 50,
+        output_b: 6,
+        probability: 0.1,
+        min_temp: 500,
+    ),
+    // Rust + Coke -> Iron + Smoke (coke reduction, most efficient)
+    (
+        name: "Rust+Coke reduction",
+        input_a: 77,
+        input_b: 168,
+        output_a: 50,
+        output_b: 6,
+        probability: 0.15,
+        min_temp: 500,
+    ),
+
+    // === Asphalt ==============================================================
+
+    // Tar + Sand -> Asphalt + Air
+    (
+        name: "Tar+Sand makes Asphalt",
+        input_a: 36,
+        input_b: 2,
+        output_a: 189,
+        output_b: 0,
+        probability: 0.2,
+    ),
+    // Bitumen + Sand -> Asphalt + Air
+    (
+        name: "Bitumen+Sand makes Asphalt",
+        input_a: 37,
+        input_b: 2,
+        output_a: 189,
+        output_b: 0,
+        probability: 0.2,
+    ),
+    // Tar + Gravel -> Asphalt + Air (aggregate asphalt)
+    (
+        name: "Tar+Gravel makes Asphalt",
+        input_a: 36,
+        input_b: 22,
+        output_a: 189,
+        output_b: 0,
+        probability: 0.2,
+    ),
+    // Bitumen + Gravel -> Asphalt + Air (aggregate asphalt)
+    (
+        name: "Bitumen+Gravel makes Asphalt",
+        input_a: 37,
+        input_b: 22,
+        output_a: 189,
+        output_b: 0,
+        probability: 0.2,
+    ),
+
+    // === Epoxy / Resin Composites =============================================
+
+    // Resin + Sand -> Epoxy + Air (resin-sand composite)
+    (
+        name: "Resin+Sand makes Epoxy",
+        input_a: 103,
+        input_b: 2,
+        output_a: 195,
+        output_b: 0,
+        probability: 0.08,
+    ),
+    // Resin + Plant Fiber -> Composite + Air (fiber-reinforced resin)
+    (
+        name: "Resin+Plant Fiber makes Composite",
+        input_a: 103,
+        input_b: 118,
+        output_a: 201,
+        output_b: 0,
+        probability: 0.1,
+    ),
+    // Resin + Cotton -> Composite + Air (fiber-reinforced resin)
+    (
+        name: "Resin+Cotton makes Composite",
+        input_a: 103,
+        input_b: 120,
+        output_a: 201,
+        output_b: 0,
+        probability: 0.1,
+    ),
+
+    // === Exotic Transmutation (Philosopher's Stone) ===========================
+
+    // Philosopher's Stone + Tin -> Philosopher's Stone + Silver
+    (
+        name: "Philosopher's Stone transmutes Tin to Silver",
+        input_a: 210,
+        input_b: 55,
+        output_a: 210,
+        output_b: 53,
+        probability: 0.1,
+        min_temp: 400,
+    ),
+    // Philosopher's Stone + Zinc -> Philosopher's Stone + Silver
+    (
+        name: "Philosopher's Stone transmutes Zinc to Silver",
+        input_a: 210,
+        input_b: 57,
+        output_a: 210,
+        output_b: 53,
+        probability: 0.1,
+        min_temp: 400,
+    ),
+    // Philosopher's Stone + Nickel -> Philosopher's Stone + Platinum
+    (
+        name: "Philosopher's Stone transmutes Nickel to Platinum",
+        input_a: 210,
+        input_b: 58,
+        output_a: 210,
+        output_b: 89,
+        probability: 0.06,
+        min_temp: 500,
+    ),
+
+    // === Exotic Transmutation (Philosopher's Mercury) =========================
+
+    // Philosopher's Mercury + Tin -> Philosopher's Mercury + Silver
+    (
+        name: "Philosopher's Mercury transmutes Tin to Silver",
+        input_a: 246,
+        input_b: 55,
+        output_a: 246,
+        output_b: 53,
+        probability: 0.05,
+        min_temp: 500,
+    ),
+    // Philosopher's Mercury + Zinc -> Philosopher's Mercury + Gold
+    (
+        name: "Philosopher's Mercury transmutes Zinc to Gold",
+        input_a: 246,
+        input_b: 57,
+        output_a: 246,
+        output_b: 52,
+        probability: 0.04,
+        min_temp: 500,
+    ),
+
+    // === Exotic Transmutation (Alchemical Reagent) ============================
+
+    // Alchemical Reagent + Iron -> Alchemical Reagent + Steel (enhancement)
+    (
+        name: "Alchemical Reagent enhances Iron to Steel",
+        input_a: 232,
+        input_b: 50,
+        output_a: 232,
+        output_b: 68,
+        probability: 0.1,
+        min_temp: 300,
+    ),
+    // Alchemical Reagent + Coal -> Alchemical Reagent + Carbon (purification)
+    (
+        name: "Alchemical Reagent purifies Coal to Carbon",
+        input_a: 232,
+        input_b: 106,
+        output_a: 232,
+        output_b: 41,
+        probability: 0.15,
+    ),
+    // Alchemical Reagent + Copper -> Alchemical Reagent + Bronze (enhancement)
+    (
+        name: "Alchemical Reagent enhances Copper to Bronze",
+        input_a: 232,
+        input_b: 51,
+        output_a: 232,
+        output_b: 66,
+        probability: 0.1,
+        min_temp: 300,
+    ),
+    // Alchemical Reagent + Sand -> Alchemical Reagent + Glass (vitrification)
+    (
+        name: "Alchemical Reagent vitrifies Sand to Glass",
+        input_a: 232,
+        input_b: 2,
+        output_a: 232,
+        output_b: 14,
+        probability: 0.1,
+    ),
+    // Alchemical Reagent + Clay -> Alchemical Reagent + Ceramic (firing)
+    (
+        name: "Alchemical Reagent fires Clay to Ceramic",
+        input_a: 232,
+        input_b: 21,
+        output_a: 232,
+        output_b: 176,
+        probability: 0.1,
+    ),
+
+    // === Exotic Transmutation (Transmutation Catalyst) ========================
+
+    // Transmutation Catalyst + Tin -> Transmutation Catalyst + Silver
+    (
+        name: "Transmutation Catalyst transmutes Tin to Silver",
+        input_a: 231,
+        input_b: 55,
+        output_a: 231,
+        output_b: 53,
+        probability: 0.03,
+        min_temp: 600,
+    ),
+    // Transmutation Catalyst + Bronze -> Transmutation Catalyst + Mythril
+    (
+        name: "Transmutation Catalyst transmutes Bronze to Mythril",
+        input_a: 231,
+        input_b: 66,
+        output_a: 231,
+        output_b: 234,
+        probability: 0.02,
+        min_temp: 700,
+    ),
+    // Transmutation Catalyst + Steel -> Transmutation Catalyst + Adamantine
+    (
+        name: "Transmutation Catalyst transmutes Steel to Adamantine",
+        input_a: 231,
+        input_b: 68,
+        output_a: 231,
+        output_b: 235,
+        probability: 0.02,
+        min_temp: 800,
+    ),
+    // Transmutation Catalyst + Gold -> Transmutation Catalyst + Orichalcum
+    (
+        name: "Transmutation Catalyst transmutes Gold to Orichalcum",
+        input_a: 231,
+        input_b: 52,
+        output_a: 231,
+        output_b: 236,
+        probability: 0.01,
+        min_temp: 900,
+    ),
+
+    // === Miscellaneous Synthesis ==============================================
+
+    // Sulfur + Charcoal -> Gunpowder + Air (black powder ingredients)
+    (
+        name: "Sulfur+Charcoal makes Gunpowder",
+        input_a: 39,
+        input_b: 105,
+        output_a: 12,
+        output_b: 0,
+        probability: 0.05,
+    ),
+    // Rubber + Sulfur -> Synthetic Rubber + Air (vulcanization)
+    (
+        name: "Rubber+Sulfur vulcanization",
+        input_a: 104,
+        input_b: 39,
+        output_a: 209,
+        output_b: 0,
+        probability: 0.1,
+        min_temp: 300,
+    ),
+    // Slag + Clay -> Brick + Air (slag-brick recycling)
+    (
+        name: "Slag+Clay makes Brick",
+        input_a: 79,
+        input_b: 21,
+        output_a: 173,
+        output_b: 0,
+        probability: 0.08,
+        min_temp: 400,
+    ),
+    // Patina + Charcoal -> Copper + Smoke (patina reduction)
+    (
+        name: "Patina+Charcoal reduction",
+        input_a: 78,
+        input_b: 105,
+        output_a: 51,
+        output_b: 6,
+        probability: 0.1,
+        min_temp: 500,
+    ),
+    // Filings + Magma -> Alloy + Slag (recycling metal filings in extreme heat)
+    (
+        name: "Filings+Magma makes Alloy",
+        input_a: 86,
+        input_b: 149,
+        output_a: 87,
+        output_b: 79,
+        probability: 0.4,
+    ),
+]
