@@ -1,0 +1,12 @@
+[package]
+name = "alkahest-persist"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+alkahest-core = { path = "../alkahest-core" }
+lz4_flex = { workspace = true }
+bytemuck = { workspace = true }
+glam = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }

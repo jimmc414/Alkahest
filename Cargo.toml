@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/alkahest-core",
+    "crates/alkahest-persist",
     "crates/alkahest-render",
     "crates/alkahest-rules",
     "crates/alkahest-sim",
@@ -35,6 +36,9 @@ glam = "=0.29.2"
 bytemuck = { version = "=1.21.0", features = ["derive"] }
 serde = { version = "=1.0.217", features = ["derive"] }
 ron = "=0.8.1"
+
+# Compression
+lz4_flex = "=0.11.3"
 
 # Error handling
 thiserror = "=2.0.11"
