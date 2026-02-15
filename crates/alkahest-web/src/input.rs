@@ -175,6 +175,12 @@ pub fn register_input_listeners(
                 let mut s = state.borrow_mut();
                 let key = e.key();
                 s.shift_down = e.shift_key();
+
+                // Prevent browser defaults for Ctrl+S (save) and Ctrl+O (open)
+                if e.ctrl_key() && (key == "s" || key == "o") {
+                    e.prevent_default();
+                }
+
                 if !s.keys_down.contains(&key) {
                     s.keys_just_pressed.push(key.clone());
                 }

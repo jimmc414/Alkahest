@@ -14,6 +14,38 @@ use wasm_bindgen::prelude::*;
 
 type RafClosure = Rc<RefCell<Option<Closure<dyn FnMut(f64)>>>>;
 
+/// Save/load state machine phases.
+pub enum SaveState {
+    /// No save/load in progress.
+    Idle,
+    /// GPU copy commands submitted, waiting for staging map.
+    CopyingToStaging {
+        staging: wgpu::Buffer,
+        chunk_coords: Vec<(glam::IVec3, u32)>,
+        is_auto: bool,
+    },
+    /// Staging buffer mapped, reading data.
+    ReadingStaged {
+        staging: wgpu::Buffer,
+        chunk_coords: Vec<(glam::IVec3, u32)>,
+        is_auto: bool,
+    },
+    /// Save file bytes ready to write to storage.
+    Writing { data: Vec<u8>, is_auto: bool },
+    /// Load file bytes received, ready to process.
+    LoadPending { bytes: Vec<u8> },
+}
+
+/// Save/load status for UI display.
+#[derive(Clone)]
+pub enum SaveStatus {
+    None,
+    Saving,
+    Saved,
+    Loading,
+    Error(String),
+}
+
 /// Material names for debug display, indexed by material ID.
 const MATERIAL_NAMES: &[&str] = &[
     "Air",
@@ -66,6 +98,24 @@ pub struct Application {
     browser_state: crate::ui::browser::BrowserState,
     /// Whether the help overlay is open.
     help_open: bool,
+    /// Save/load state machine.
+    save_state: SaveState,
+    /// Save/load status for UI display.
+    pub save_status: SaveStatus,
+    /// Auto-save timer in milliseconds.
+    auto_save_timer: f64,
+    /// Auto-save interval in milliseconds (default: 5 minutes).
+    pub auto_save_interval: f64,
+    /// Whether auto-save is enabled.
+    pub auto_save_enabled: bool,
+    /// Rule hash mismatch warnings from the last load.
+    pub rule_mismatch_warning: Option<Vec<String>>,
+    /// Deferred save trigger (set by Ctrl+S, processed next frame).
+    trigger_save: bool,
+    /// Deferred load trigger (set by Ctrl+O, processed next frame).
+    trigger_load: bool,
+    /// Shared slot for async file picker results.
+    load_pending_data: Rc<RefCell<Option<Vec<u8>>>>,
 }
 
 impl Application {
@@ -165,6 +215,15 @@ impl Application {
             frame_delta_ms: 16.67,
             browser_state: crate::ui::browser::BrowserState::new(),
             help_open: false,
+            save_state: SaveState::Idle,
+            save_status: SaveStatus::None,
+            auto_save_timer: 0.0,
+            auto_save_interval: 300_000.0, // 5 minutes
+            auto_save_enabled: true,
+            rule_mismatch_warning: None,
+            trigger_save: false,
+            trigger_load: false,
+            load_pending_data: Rc::new(RefCell::new(None)),
         }
     }
 
@@ -372,8 +431,377 @@ impl Application {
         results
     }
 
+    /// Begin a save operation. Creates a staging buffer, copies all chunk data from GPU.
+    fn begin_save(&mut self, is_auto: bool) {
+        if !matches!(self.save_state, SaveState::Idle) {
+            return; // Already saving/loading
+        }
+
+        self.save_status = SaveStatus::Saving;
+
+        // Collect loaded chunks: (coord, pool_slot)
+        let chunk_coords: Vec<(glam::IVec3, u32)> = self
+            .world
+            .chunk_map()
+            .iter()
+            .filter_map(|(coord, chunk)| chunk.pool_slot.map(|slot| (*coord, slot)))
+            .collect();
+
+        if chunk_coords.is_empty() {
+            // Nothing to save — go straight to writing
+            let camera_state = self.camera_to_persist();
+            let data = alkahest_persist::save(
+                &[],
+                self.sim.rule_hash(),
+                self.sim.tick_count(),
+                42,
+                camera_state,
+            );
+            self.save_state = SaveState::Writing { data, is_auto };
+            return;
+        }
+
+        // Create bulk staging buffer
+        let staging_size =
+            chunk_coords.len() as u64 * alkahest_core::constants::BYTES_PER_CHUNK as u64;
+        let staging = self.gpu.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("save-staging-buffer"),
+            size: staging_size,
+            usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        // Encode copy commands
+        let mut encoder = self
+            .gpu
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("save-copy-encoder"),
+            });
+
+        let read_pool = self.sim.get_read_pool();
+        for (i, &(_coord, pool_slot)) in chunk_coords.iter().enumerate() {
+            let src_offset = pool_slot as u64 * alkahest_core::constants::BYTES_PER_CHUNK as u64;
+            let dst_offset = i as u64 * alkahest_core::constants::BYTES_PER_CHUNK as u64;
+            encoder.copy_buffer_to_buffer(
+                read_pool,
+                src_offset,
+                &staging,
+                dst_offset,
+                alkahest_core::constants::BYTES_PER_CHUNK as u64,
+            );
+        }
+
+        self.gpu.queue.submit(std::iter::once(encoder.finish()));
+
+        self.save_state = SaveState::CopyingToStaging {
+            staging,
+            chunk_coords,
+            is_auto,
+        };
+    }
+
+    /// Process one frame's worth of save/load state machine.
+    fn update_save_state(&mut self) {
+        // Take the current state to process it (avoids borrow issues)
+        let state = std::mem::replace(&mut self.save_state, SaveState::Idle);
+
+        match state {
+            SaveState::Idle => {
+                self.save_state = SaveState::Idle;
+            }
+            SaveState::CopyingToStaging {
+                staging,
+                chunk_coords,
+                is_auto,
+            } => {
+                // Initiate mapAsync
+                let slice = staging.slice(..);
+                let (tx, rx) = std::sync::mpsc::channel();
+                slice.map_async(wgpu::MapMode::Read, move |result| {
+                    let _ = tx.send(result);
+                });
+                self.gpu.device.poll(wgpu::Maintain::Poll);
+
+                // Check if mapping completed this frame
+                match rx.try_recv() {
+                    Ok(Ok(())) => {
+                        // Mapping ready — read data
+                        let data = slice.get_mapped_range();
+                        let all_bytes: Vec<u8> = data.to_vec();
+                        drop(data);
+                        staging.unmap();
+
+                        // Build ChunkSnapshots
+                        let chunk_size = alkahest_core::constants::BYTES_PER_CHUNK as usize;
+                        let chunks: Vec<alkahest_persist::ChunkSnapshot> = chunk_coords
+                            .iter()
+                            .enumerate()
+                            .map(|(i, &(coord, _slot))| {
+                                let start = i * chunk_size;
+                                let end = start + chunk_size;
+                                alkahest_persist::ChunkSnapshot {
+                                    coord,
+                                    voxel_data: all_bytes[start..end].to_vec(),
+                                }
+                            })
+                            .collect();
+
+                        let camera_state = self.camera_to_persist();
+                        let save_data = alkahest_persist::save(
+                            &chunks,
+                            self.sim.rule_hash(),
+                            self.sim.tick_count(),
+                            42,
+                            camera_state,
+                        );
+
+                        self.save_state = SaveState::Writing {
+                            data: save_data,
+                            is_auto,
+                        };
+                    }
+                    _ => {
+                        // Not ready yet — put the state back
+                        self.save_state = SaveState::ReadingStaged {
+                            staging,
+                            chunk_coords,
+                            is_auto,
+                        };
+                    }
+                }
+            }
+            SaveState::ReadingStaged {
+                staging,
+                chunk_coords,
+                is_auto,
+            } => {
+                // Try mapping again
+                let slice = staging.slice(..);
+                let (tx, rx) = std::sync::mpsc::channel();
+                slice.map_async(wgpu::MapMode::Read, move |result| {
+                    let _ = tx.send(result);
+                });
+                self.gpu.device.poll(wgpu::Maintain::Poll);
+
+                match rx.try_recv() {
+                    Ok(Ok(())) => {
+                        let data = slice.get_mapped_range();
+                        let all_bytes: Vec<u8> = data.to_vec();
+                        drop(data);
+                        staging.unmap();
+
+                        let chunk_size = alkahest_core::constants::BYTES_PER_CHUNK as usize;
+                        let chunks: Vec<alkahest_persist::ChunkSnapshot> = chunk_coords
+                            .iter()
+                            .enumerate()
+                            .map(|(i, &(coord, _slot))| {
+                                let start = i * chunk_size;
+                                let end = start + chunk_size;
+                                alkahest_persist::ChunkSnapshot {
+                                    coord,
+                                    voxel_data: all_bytes[start..end].to_vec(),
+                                }
+                            })
+                            .collect();
+
+                        let camera_state = self.camera_to_persist();
+                        let save_data = alkahest_persist::save(
+                            &chunks,
+                            self.sim.rule_hash(),
+                            self.sim.tick_count(),
+                            42,
+                            camera_state,
+                        );
+
+                        self.save_state = SaveState::Writing {
+                            data: save_data,
+                            is_auto,
+                        };
+                    }
+                    _ => {
+                        // Still not ready
+                        self.save_state = SaveState::ReadingStaged {
+                            staging,
+                            chunk_coords,
+                            is_auto,
+                        };
+                    }
+                }
+            }
+            SaveState::Writing { data, is_auto } => {
+                if is_auto {
+                    crate::storage::auto_save_to_idb(&data, "auto");
+                } else {
+                    crate::storage::save_to_file(&data, "world.alka");
+                }
+                self.save_status = SaveStatus::Saved;
+                self.save_state = SaveState::Idle;
+                log::info!("Save complete ({} bytes, auto={})", data.len(), is_auto);
+            }
+            SaveState::LoadPending { bytes } => {
+                self.process_load(&bytes);
+                self.save_state = SaveState::Idle;
+            }
+        }
+    }
+
+    /// Process loaded save data: rebuild world from save file.
+    fn process_load(&mut self, bytes: &[u8]) {
+        self.save_status = SaveStatus::Loading;
+
+        let rule_hash = self.sim.rule_hash();
+        let save_data = match alkahest_persist::load(bytes, rule_hash) {
+            Ok(data) => data,
+            Err(e) => {
+                log::error!("Load failed: {e}");
+                self.save_status = SaveStatus::Error(format!("{e}"));
+                return;
+            }
+        };
+
+        // Store warnings for UI display
+        if !save_data.warnings.is_empty() {
+            self.rule_mismatch_warning = Some(save_data.warnings);
+        }
+
+        // Restore tick count
+        self.sim.set_tick_count(save_data.header.tick_count);
+
+        // Restore camera
+        let cam = &save_data.camera;
+        self.camera.yaw = cam.yaw;
+        self.camera.pitch = cam.pitch;
+        self.camera.target = glam::Vec3::new(cam.target[0], cam.target[1], cam.target[2]);
+        self.camera.distance = cam.distance;
+        if cam.mode == 1 {
+            self.camera.mode = crate::camera::CameraMode::FirstPerson;
+            self.camera.fp_position = self.camera.target;
+        } else {
+            self.camera.mode = crate::camera::CameraMode::Orbit;
+        }
+
+        // Clear and rebuild the world chunk map
+        // Unload all existing chunks
+        let existing_coords: Vec<glam::IVec3> = self
+            .world
+            .chunk_map()
+            .iter()
+            .map(|(coord, _)| *coord)
+            .collect();
+        for coord in &existing_coords {
+            self.world.chunk_map_mut().unload_chunk(coord);
+        }
+
+        // Load saved chunks
+        for (coord, voxel_data) in &save_data.chunks {
+            if let Some(pool_slot) = self.world.chunk_map_mut().load_chunk(*coord) {
+                // Convert bytes to [u32; 2] slice for upload
+                let voxel_pairs: &[[u32; 2]] = bytemuck::cast_slice(voxel_data);
+                self.sim.chunk_pool().upload_chunk_data_both(
+                    &self.gpu.queue,
+                    pool_slot,
+                    voxel_pairs,
+                );
+
+                // Mark chunk as having non-air data
+                if let Some(chunk) = self.world.chunk_map_mut().get_mut(coord) {
+                    chunk.has_non_air = voxel_data.iter().any(|&b| b != 0);
+                }
+            } else {
+                log::warn!("No pool slot available for chunk {:?}", coord);
+            }
+        }
+
+        // Rebuild renderer chunk map and octree
+        let chunk_map_data = Self::build_renderer_chunk_map(self.world.chunk_map());
+        self.renderer
+            .update_chunk_map(&self.gpu.queue, &chunk_map_data);
+
+        let chunk_occupancy: Vec<_> = self
+            .world
+            .chunk_map()
+            .iter()
+            .map(|(coord, chunk)| (*coord, chunk.has_non_air))
+            .collect();
+        self.octree.rebuild(&chunk_occupancy);
+        self.renderer
+            .update_octree(&self.gpu.queue, &self.octree.gpu_data());
+        self.octree.clear_dirty();
+
+        self.save_status = SaveStatus::Saved;
+        log::info!(
+            "Load complete: {} chunks, tick {}",
+            save_data.chunks.len(),
+            save_data.header.tick_count
+        );
+    }
+
+    /// Begin loading from a file (triggers file picker dialog).
+    /// The async callback writes into `load_pending_data`, polled next frame.
+    fn begin_load_from_file(&mut self) {
+        if !matches!(self.save_state, SaveState::Idle) {
+            return;
+        }
+        self.save_status = SaveStatus::Loading;
+        let pending = self.load_pending_data.clone();
+        crate::storage::load_from_file(move |bytes| {
+            *pending.borrow_mut() = Some(bytes);
+        });
+    }
+
+    /// Convert camera state to the persist format.
+    fn camera_to_persist(&self) -> alkahest_persist::CameraState {
+        let mode = match self.camera.mode {
+            crate::camera::CameraMode::Orbit => 0,
+            crate::camera::CameraMode::FirstPerson => 1,
+        };
+        alkahest_persist::CameraState {
+            mode,
+            yaw: self.camera.yaw,
+            pitch: self.camera.pitch,
+            target: [
+                self.camera.target.x,
+                self.camera.target.y,
+                self.camera.target.z,
+            ],
+            distance: self.camera.distance,
+        }
+    }
+
     /// Render a single frame.
     fn render_frame(&mut self) {
+        // Check for pending load data from async file picker
+        if let Some(bytes) = self.load_pending_data.borrow_mut().take() {
+            self.save_state = SaveState::LoadPending { bytes };
+        }
+
+        // Process deferred save/load triggers from previous frame's keyboard input
+        if self.trigger_save {
+            self.trigger_save = false;
+            if matches!(self.save_state, SaveState::Idle) {
+                self.begin_save(false);
+            }
+        }
+        if self.trigger_load {
+            self.trigger_load = false;
+            if matches!(self.save_state, SaveState::Idle) {
+                self.begin_load_from_file();
+            }
+        }
+
+        // Process save/load state machine
+        self.update_save_state();
+
+        // Auto-save timer
+        if self.auto_save_enabled && matches!(self.save_state, SaveState::Idle) {
+            self.auto_save_timer += self.frame_delta_ms;
+            if self.auto_save_timer >= self.auto_save_interval {
+                self.auto_save_timer = 0.0;
+                self.begin_save(true);
+            }
+        }
+
         // Destructure self for disjoint field borrows
         let Application {
             gpu,
@@ -395,6 +823,12 @@ impl Application {
             frame_delta_ms,
             browser_state,
             help_open,
+            save_state,
+            save_status,
+            auto_save_enabled,
+            rule_mismatch_warning,
+            trigger_save,
+            trigger_load,
             ..
         } = self;
 
@@ -551,6 +985,15 @@ impl Application {
             // ? or F1: toggle help overlay
             if input.was_just_pressed("?") || input.was_just_pressed("F1") {
                 *help_open = !*help_open;
+            }
+
+            // Ctrl+S: save world
+            if input.keys_down.contains("Control") && input.was_just_pressed("s") {
+                *trigger_save = true;
+            }
+            // Ctrl+O: load world
+            if input.keys_down.contains("Control") && input.was_just_pressed("o") {
+                *trigger_load = true;
             }
 
             // Revert to orbit if pointer lock was lost while in FP mode (e.g. user pressed Escape)
@@ -788,7 +1231,20 @@ impl Application {
             }
             crate::ui::hud::show(ctx, tool_state, MATERIAL_NAMES, *sim_speed, sim.is_paused());
             crate::ui::hover::show(ctx, pick_result, MATERIAL_NAMES);
-            crate::ui::settings::show(ctx, clip_axis, clip_position, sim_speed, render_mode);
+            let save_idle = matches!(save_state, SaveState::Idle);
+            crate::ui::settings::show(
+                ctx,
+                clip_axis,
+                clip_position,
+                sim_speed,
+                render_mode,
+                save_status,
+                auto_save_enabled,
+                rule_mismatch_warning,
+                trigger_save,
+                trigger_load,
+                save_idle,
+            );
             crate::ui::help::show(ctx, help_open);
         });
 
