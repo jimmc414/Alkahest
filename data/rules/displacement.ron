@@ -1,0 +1,968 @@
+[
+    // ============================================================================
+    // Displacement Interaction Rules
+    // ============================================================================
+    // Covers: density-driven displacement interactions, reactive displacement,
+    //         exotic material interactions, gas mixing, plasma displacement,
+    //         mercury behavior, salt dissolution, superheated steam effects,
+    //         quicksilver amalgamation, and transmutation.
+    //
+    // NOTE: Phase change rules (melting, solidification, evaporation,
+    //       condensation) are in phase_change.ron. Combustion reactions
+    //       (Fire+material) are in combustion.ron. Explosive reactions
+    //       (Gunpowder+ignition) are in structural.ron.
+    // ============================================================================
+
+    // === Lava Displacement ===
+    // Lava interacting with cold solids and liquids not covered by phase_change.
+
+    // Lava + Ice -> Stone + Steam (rapid quench + melt)
+    (
+        name: "Lava displaces Ice",
+        input_a: 11,
+        input_b: 10,
+        output_a: 1,
+        output_b: 7,
+        probability: 0.9,
+        temp_delta: -150,
+    ),
+    // Lava + Snow -> Lava + Steam (snow flash-boils, lava persists)
+    (
+        name: "Lava displaces Snow",
+        input_a: 11,
+        input_b: 33,
+        output_a: 11,
+        output_b: 7,
+        probability: 0.95,
+        temp_delta: -50,
+    ),
+    // Lava + Brine -> Stone + Steam (brine quenches lava)
+    (
+        name: "Lava displaces Brine",
+        input_a: 11,
+        input_b: 34,
+        output_a: 1,
+        output_b: 7,
+        probability: 0.75,
+        temp_delta: -250,
+    ),
+    // Lava + Ash -> Lava + Slag (ash fuses into slag)
+    (
+        name: "Lava fuses Ash to Slag",
+        input_a: 11,
+        input_b: 9,
+        output_a: 11,
+        output_b: 79,
+        probability: 0.3,
+    ),
+    // Lava + Slag -> Lava + Slag (inert, slag already fused)
+    (
+        name: "Lava+Slag inert",
+        input_a: 11,
+        input_b: 79,
+        output_a: 11,
+        output_b: 79,
+        probability: 0.0,
+    ),
+    // Lava + Carbon Dioxide -> Lava + Carbon Dioxide (inert gas displacement)
+    (
+        name: "Lava+CO2 inert",
+        input_a: 11,
+        input_b: 156,
+        output_a: 11,
+        output_b: 156,
+        probability: 0.0,
+    ),
+
+    // === Magma Displacement ===
+    // Magma is denser/hotter than Lava.
+
+    // Magma + Ice -> Volcanic Rock + Steam
+    (
+        name: "Magma displaces Ice",
+        input_a: 149,
+        input_b: 10,
+        output_a: 49,
+        output_b: 7,
+        probability: 0.95,
+        temp_delta: -200,
+    ),
+    // Magma + Snow -> Magma + Steam
+    (
+        name: "Magma displaces Snow",
+        input_a: 149,
+        input_b: 33,
+        output_a: 149,
+        output_b: 7,
+        probability: 0.95,
+        temp_delta: -60,
+    ),
+    // Magma + Brine -> Volcanic Rock + Superheated Steam
+    (
+        name: "Magma displaces Brine",
+        input_a: 149,
+        input_b: 34,
+        output_a: 49,
+        output_b: 150,
+        probability: 0.85,
+        temp_delta: -300,
+    ),
+    // Magma + Seawater -> Volcanic Rock + Superheated Steam
+    (
+        name: "Magma displaces Seawater",
+        input_a: 149,
+        input_b: 35,
+        output_a: 49,
+        output_b: 150,
+        probability: 0.85,
+        temp_delta: -280,
+    ),
+    // Magma + Ash -> Magma + Slag
+    (
+        name: "Magma fuses Ash to Slag",
+        input_a: 149,
+        input_b: 9,
+        output_a: 149,
+        output_b: 79,
+        probability: 0.4,
+    ),
+    // Magma + Slag -> Magma + Lava (slag re-melts in magma)
+    (
+        name: "Magma remelts Slag",
+        input_a: 149,
+        input_b: 79,
+        output_a: 149,
+        output_b: 11,
+        probability: 0.15,
+        min_temp: 800,
+    ),
+    // Magma + Lava -> Magma + Lava (immiscible hot fluids, inert)
+    (
+        name: "Magma+Lava inert",
+        input_a: 149,
+        input_b: 11,
+        output_a: 149,
+        output_b: 11,
+        probability: 0.0,
+    ),
+    // Magma + Carbon Dioxide -> Magma + Carbon Dioxide (volcanic gas release, inert)
+    (
+        name: "Magma+CO2 inert",
+        input_a: 149,
+        input_b: 156,
+        output_a: 149,
+        output_b: 156,
+        probability: 0.0,
+    ),
+
+    // === Molten Metal Displacement ===
+    // Water quenching is in phase_change.ron. These cover other coolants.
+
+    // Molten Iron + Ice -> Iron + Steam
+    (
+        name: "Molten Iron displaces Ice",
+        input_a: 71,
+        input_b: 10,
+        output_a: 50,
+        output_b: 7,
+        probability: 0.85,
+        temp_delta: -180,
+    ),
+    // Molten Copper + Ice -> Copper + Steam
+    (
+        name: "Molten Copper displaces Ice",
+        input_a: 72,
+        input_b: 10,
+        output_a: 51,
+        output_b: 7,
+        probability: 0.85,
+        temp_delta: -160,
+    ),
+    // Molten Gold + Ice -> Gold + Steam
+    (
+        name: "Molten Gold displaces Ice",
+        input_a: 73,
+        input_b: 10,
+        output_a: 52,
+        output_b: 7,
+        probability: 0.85,
+        temp_delta: -130,
+    ),
+    // Molten Silver + Ice -> Silver + Steam
+    (
+        name: "Molten Silver displaces Ice",
+        input_a: 74,
+        input_b: 10,
+        output_a: 53,
+        output_b: 7,
+        probability: 0.85,
+        temp_delta: -130,
+    ),
+    // Molten Aluminum + Ice -> Aluminum + Steam (steam explosion risk)
+    (
+        name: "Molten Aluminum displaces Ice",
+        input_a: 75,
+        input_b: 10,
+        output_a: 54,
+        output_b: 7,
+        probability: 0.9,
+        temp_delta: -160,
+        pressure_delta: 10,
+    ),
+    // Molten Iron + Snow -> Iron + Water (gentle cooling)
+    (
+        name: "Molten Iron displaces Snow",
+        input_a: 71,
+        input_b: 33,
+        output_a: 50,
+        output_b: 3,
+        probability: 0.7,
+        temp_delta: -120,
+    ),
+    // Molten Copper + Snow -> Copper + Water
+    (
+        name: "Molten Copper displaces Snow",
+        input_a: 72,
+        input_b: 33,
+        output_a: 51,
+        output_b: 3,
+        probability: 0.7,
+        temp_delta: -100,
+    ),
+    // Molten Iron + Brine -> Iron + Steam
+    (
+        name: "Molten Iron quenched by Brine",
+        input_a: 71,
+        input_b: 34,
+        output_a: 50,
+        output_b: 7,
+        probability: 0.85,
+        temp_delta: -190,
+    ),
+    // Molten Copper + Brine -> Copper + Steam
+    (
+        name: "Molten Copper quenched by Brine",
+        input_a: 72,
+        input_b: 34,
+        output_a: 51,
+        output_b: 7,
+        probability: 0.85,
+        temp_delta: -170,
+    ),
+    // Molten Gold + Brine -> Gold + Steam (brine quench)
+    (
+        name: "Molten Gold quenched by Brine",
+        input_a: 73,
+        input_b: 34,
+        output_a: 52,
+        output_b: 7,
+        probability: 0.8,
+        temp_delta: -140,
+    ),
+    // Molten Silver + Brine -> Silver + Steam (brine quench)
+    (
+        name: "Molten Silver quenched by Brine",
+        input_a: 74,
+        input_b: 34,
+        output_a: 53,
+        output_b: 7,
+        probability: 0.8,
+        temp_delta: -140,
+    ),
+    // Molten Gold + Snow -> Gold + Water (gentle cooling)
+    (
+        name: "Molten Gold displaces Snow",
+        input_a: 73,
+        input_b: 33,
+        output_a: 52,
+        output_b: 3,
+        probability: 0.7,
+        temp_delta: -90,
+    ),
+    // Molten Silver + Snow -> Silver + Water (gentle cooling)
+    (
+        name: "Molten Silver displaces Snow",
+        input_a: 74,
+        input_b: 33,
+        output_a: 53,
+        output_b: 3,
+        probability: 0.7,
+        temp_delta: -90,
+    ),
+
+    // === Acid Displacement (reactive chemical) ===
+
+    // Acid + Stone -> Acid + Sand (acid erodes stone)
+    (
+        name: "Acid erodes Stone",
+        input_a: 166,
+        input_b: 1,
+        output_a: 166,
+        output_b: 2,
+        probability: 0.15,
+    ),
+    // Acid + Iron -> Acid + Slag (acid corrodes iron)
+    (
+        name: "Acid corrodes Iron",
+        input_a: 166,
+        input_b: 50,
+        output_a: 166,
+        output_b: 79,
+        probability: 0.2,
+    ),
+    // Acid + Copper -> Acid + Slag (acid corrodes copper)
+    (
+        name: "Acid corrodes Copper",
+        input_a: 166,
+        input_b: 51,
+        output_a: 166,
+        output_b: 79,
+        probability: 0.15,
+    ),
+    // Acid + Aluminum -> Acid + Hydrogen (aluminum dissolves releasing hydrogen)
+    (
+        name: "Acid dissolves Aluminum",
+        input_a: 166,
+        input_b: 54,
+        output_a: 166,
+        output_b: 45,
+        probability: 0.25,
+        temp_delta: 30,
+    ),
+    // Acid + Water -> Acid + Water (miscible, inert)
+    (
+        name: "Acid+Water miscible",
+        input_a: 166,
+        input_b: 3,
+        output_a: 166,
+        output_b: 3,
+        probability: 0.0,
+    ),
+    // Acid + Brine -> Acid + Toxic Gas (acid reacts with salt solution)
+    (
+        name: "Acid reacts with Brine",
+        input_a: 166,
+        input_b: 34,
+        output_a: 166,
+        output_b: 134,
+        probability: 0.3,
+        temp_delta: 20,
+    ),
+    // Acid + Seawater -> Acid + Toxic Gas
+    (
+        name: "Acid reacts with Seawater",
+        input_a: 166,
+        input_b: 35,
+        output_a: 166,
+        output_b: 134,
+        probability: 0.25,
+        temp_delta: 15,
+    ),
+    // Acid + Sand -> Acid + Sand (silica is acid-resistant, inert)
+    (
+        name: "Acid+Sand inert",
+        input_a: 166,
+        input_b: 2,
+        output_a: 166,
+        output_b: 2,
+        probability: 0.0,
+    ),
+    // Acid + Gold -> Acid + Gold (gold is acid-resistant, inert)
+    (
+        name: "Acid+Gold inert",
+        input_a: 166,
+        input_b: 52,
+        output_a: 166,
+        output_b: 52,
+        probability: 0.0,
+    ),
+    // Acid + Silver -> Acid + Slag (acid tarnishes silver)
+    (
+        name: "Acid tarnishes Silver",
+        input_a: 166,
+        input_b: 53,
+        output_a: 166,
+        output_b: 79,
+        probability: 0.1,
+    ),
+    // Acid + Lead -> Acid + Toxic Gas (lead reacts slowly, toxic fumes)
+    (
+        name: "Acid dissolves Lead",
+        input_a: 166,
+        input_b: 56,
+        output_a: 166,
+        output_b: 134,
+        probability: 0.1,
+    ),
+
+    // === Gas Displacement / Mixing ===
+
+    // Carbon Dioxide + Oxygen -> CO2 + O2 (inert mixing)
+    (
+        name: "CO2+Oxygen inert mixing",
+        input_a: 156,
+        input_b: 44,
+        output_a: 156,
+        output_b: 44,
+        probability: 0.0,
+    ),
+    // Hydrogen + Oxygen -> Water + Water (slow recombination without spark)
+    (
+        name: "Hydrogen+Oxygen slow recombination",
+        input_a: 45,
+        input_b: 44,
+        output_a: 3,
+        output_b: 3,
+        probability: 0.1,
+        temp_delta: 200,
+    ),
+    // Nitrogen + Oxygen -> N2 + O2 (inert mixing)
+    (
+        name: "Nitrogen+Oxygen inert mixing",
+        input_a: 43,
+        input_b: 44,
+        output_a: 43,
+        output_b: 44,
+        probability: 0.0,
+    ),
+    // Helium + Oxygen -> He + O2 (noble gas, inert)
+    (
+        name: "Helium+Oxygen inert",
+        input_a: 46,
+        input_b: 44,
+        output_a: 46,
+        output_b: 44,
+        probability: 0.0,
+    ),
+    // Helium + Nitrogen -> He + N2 (noble gas, inert)
+    (
+        name: "Helium+Nitrogen inert",
+        input_a: 46,
+        input_b: 43,
+        output_a: 46,
+        output_b: 43,
+        probability: 0.0,
+    ),
+    // Hydrogen + Nitrogen -> H2 + N2 (inert at normal temps)
+    (
+        name: "Hydrogen+Nitrogen inert",
+        input_a: 45,
+        input_b: 43,
+        output_a: 45,
+        output_b: 43,
+        probability: 0.0,
+    ),
+    // Carbon Dioxide + Nitrogen -> CO2 + N2 (inert mixing)
+    (
+        name: "CO2+Nitrogen inert mixing",
+        input_a: 156,
+        input_b: 43,
+        output_a: 156,
+        output_b: 43,
+        probability: 0.0,
+    ),
+    // Toxic Gas + Oxygen -> Toxic Gas + CO2 (partial oxidation)
+    (
+        name: "Toxic Gas oxidizes in Oxygen",
+        input_a: 134,
+        input_b: 44,
+        output_a: 134,
+        output_b: 156,
+        probability: 0.05,
+    ),
+
+    // === Plasma Displacement ===
+
+    // Plasma + Water -> Steam + Steam
+    (
+        name: "Plasma flash-boils Water",
+        input_a: 130,
+        input_b: 3,
+        output_a: 150,
+        output_b: 7,
+        probability: 0.9,
+        temp_delta: -200,
+    ),
+    // Plasma + Ice -> Steam + Steam
+    (
+        name: "Plasma vaporizes Ice",
+        input_a: 130,
+        input_b: 10,
+        output_a: 150,
+        output_b: 7,
+        probability: 0.95,
+        temp_delta: -150,
+    ),
+    // Plasma + Sand -> Plasma + Slag (sand vitrifies and fuses)
+    (
+        name: "Plasma vitrifies Sand to Slag",
+        input_a: 130,
+        input_b: 2,
+        output_a: 130,
+        output_b: 79,
+        probability: 0.4,
+        temp_delta: -50,
+    ),
+    // Plasma + Stone -> Plasma + Lava (stone melts)
+    (
+        name: "Plasma melts Stone",
+        input_a: 130,
+        input_b: 1,
+        output_a: 130,
+        output_b: 11,
+        probability: 0.3,
+        temp_delta: -80,
+    ),
+    // Plasma + Iron -> Plasma + Molten Iron
+    (
+        name: "Plasma melts Iron",
+        input_a: 130,
+        input_b: 50,
+        output_a: 130,
+        output_b: 71,
+        probability: 0.5,
+        temp_delta: -60,
+    ),
+    // Plasma + Copper -> Plasma + Molten Copper
+    (
+        name: "Plasma melts Copper",
+        input_a: 130,
+        input_b: 51,
+        output_a: 130,
+        output_b: 72,
+        probability: 0.5,
+        temp_delta: -50,
+    ),
+    // Plasma + Snow -> Plasma + Steam
+    (
+        name: "Plasma vaporizes Snow",
+        input_a: 130,
+        input_b: 33,
+        output_a: 130,
+        output_b: 7,
+        probability: 0.95,
+        temp_delta: -40,
+    ),
+
+    // === Mercury Displacement ===
+
+    // Mercury + Water -> Mercury + Water (immiscible, density separation)
+    (
+        name: "Mercury+Water immiscible",
+        input_a: 88,
+        input_b: 3,
+        output_a: 88,
+        output_b: 3,
+        probability: 0.0,
+    ),
+    // Mercury + Sand -> Mercury + Sand (mercury sinks through sand)
+    (
+        name: "Mercury+Sand density displacement",
+        input_a: 88,
+        input_b: 2,
+        output_a: 88,
+        output_b: 2,
+        probability: 0.0,
+    ),
+    // Mercury + Iron -> Mercury + Iron (mercury does not amalgamate iron)
+    (
+        name: "Mercury+Iron inert",
+        input_a: 88,
+        input_b: 50,
+        output_a: 88,
+        output_b: 50,
+        probability: 0.0,
+    ),
+
+    // === Exotic Displacement: Antimatter ===
+
+    // Antimatter + Water -> Air + Steam (annihilation)
+    (
+        name: "Antimatter annihilates Water",
+        input_a: 221,
+        input_b: 3,
+        output_a: 0,
+        output_b: 7,
+        probability: 1.0,
+        temp_delta: 500,
+        pressure_delta: 40,
+    ),
+    // Antimatter + Stone -> Air + Air (total annihilation)
+    (
+        name: "Antimatter annihilates Stone",
+        input_a: 221,
+        input_b: 1,
+        output_a: 0,
+        output_b: 0,
+        probability: 1.0,
+        temp_delta: 600,
+        pressure_delta: 50,
+    ),
+    // Antimatter + Iron -> Air + Air (annihilation)
+    (
+        name: "Antimatter annihilates Iron",
+        input_a: 221,
+        input_b: 50,
+        output_a: 0,
+        output_b: 0,
+        probability: 1.0,
+        temp_delta: 700,
+        pressure_delta: 55,
+    ),
+    // Antimatter + Sand -> Air + Air (annihilation)
+    (
+        name: "Antimatter annihilates Sand",
+        input_a: 221,
+        input_b: 2,
+        output_a: 0,
+        output_b: 0,
+        probability: 1.0,
+        temp_delta: 550,
+        pressure_delta: 45,
+    ),
+    // Antimatter + Gold -> Air + Air (annihilation)
+    (
+        name: "Antimatter annihilates Gold",
+        input_a: 221,
+        input_b: 52,
+        output_a: 0,
+        output_b: 0,
+        probability: 1.0,
+        temp_delta: 800,
+        pressure_delta: 60,
+    ),
+    // Antimatter + Lava -> Air + Air (annihilation)
+    (
+        name: "Antimatter annihilates Lava",
+        input_a: 221,
+        input_b: 11,
+        output_a: 0,
+        output_b: 0,
+        probability: 1.0,
+        temp_delta: 400,
+        pressure_delta: 45,
+    ),
+    // Antimatter + Ice -> Air + Steam (annihilation with phase residue)
+    (
+        name: "Antimatter annihilates Ice",
+        input_a: 221,
+        input_b: 10,
+        output_a: 0,
+        output_b: 7,
+        probability: 1.0,
+        temp_delta: 450,
+        pressure_delta: 35,
+    ),
+
+    // === Exotic Displacement: Cursed Water and Holy Water ===
+
+    // Cursed Water + Water -> Cursed Water + Cursed Water (spreads slowly)
+    (
+        name: "Cursed Water corrupts Water",
+        input_a: 219,
+        input_b: 3,
+        output_a: 219,
+        output_b: 219,
+        probability: 0.1,
+    ),
+    // Holy Water + Cursed Water -> Water + Water (purification)
+    (
+        name: "Holy Water purifies Cursed Water",
+        input_a: 220,
+        input_b: 219,
+        output_a: 3,
+        output_b: 3,
+        probability: 0.8,
+        temp_delta: -50,
+    ),
+    // Cursed Water + Ice -> Cursed Water + Cursed Water (corruption spreads to ice)
+    (
+        name: "Cursed Water corrupts Ice",
+        input_a: 219,
+        input_b: 10,
+        output_a: 219,
+        output_b: 219,
+        probability: 0.05,
+    ),
+    // Holy Water + Water -> Holy Water + Water (inert, does not spread)
+    (
+        name: "Holy Water+Water inert",
+        input_a: 220,
+        input_b: 3,
+        output_a: 220,
+        output_b: 3,
+        probability: 0.0,
+    ),
+    // Cursed Water + Sand -> Cursed Water + Sand (no corruption of solids)
+    (
+        name: "Cursed Water+Sand inert",
+        input_a: 219,
+        input_b: 2,
+        output_a: 219,
+        output_b: 2,
+        probability: 0.0,
+    ),
+
+    // === Exotic Displacement: Phoenix Ember ===
+
+    // Phoenix Ember + Water -> Phoenix Ember + Steam (cannot be extinguished)
+    (
+        name: "Phoenix Ember resists Water",
+        input_a: 225,
+        input_b: 3,
+        output_a: 225,
+        output_b: 7,
+        probability: 0.9,
+        temp_delta: 50,
+    ),
+    // Phoenix Ember + Ice -> Phoenix Ember + Water (melts ice, survives)
+    (
+        name: "Phoenix Ember melts Ice",
+        input_a: 225,
+        input_b: 10,
+        output_a: 225,
+        output_b: 3,
+        probability: 0.95,
+    ),
+    // Phoenix Ember + Snow -> Phoenix Ember + Water
+    (
+        name: "Phoenix Ember melts Snow",
+        input_a: 225,
+        input_b: 33,
+        output_a: 225,
+        output_b: 3,
+        probability: 0.95,
+    ),
+    // Phoenix Ember + Sand -> Phoenix Ember + Sand (inert, fire on sand)
+    (
+        name: "Phoenix Ember+Sand inert",
+        input_a: 225,
+        input_b: 2,
+        output_a: 225,
+        output_b: 2,
+        probability: 0.0,
+    ),
+    // Phoenix Ember + Stone -> Phoenix Ember + Stone (inert)
+    (
+        name: "Phoenix Ember+Stone inert",
+        input_a: 225,
+        input_b: 1,
+        output_a: 225,
+        output_b: 1,
+        probability: 0.0,
+    ),
+
+    // === Salt Dissolution ===
+
+    // Salt + Water -> Brine + Water (salt dissolves)
+    (
+        name: "Salt dissolves in Water",
+        input_a: 26,
+        input_b: 3,
+        output_a: 34,
+        output_b: 3,
+        probability: 0.2,
+    ),
+    // Salt + Seawater -> Salt + Seawater (already saturated, inert)
+    (
+        name: "Salt+Seawater saturated",
+        input_a: 26,
+        input_b: 35,
+        output_a: 26,
+        output_b: 35,
+        probability: 0.0,
+    ),
+    // Salt + Brine -> Salt + Brine (already salty, inert)
+    (
+        name: "Salt+Brine saturated",
+        input_a: 26,
+        input_b: 34,
+        output_a: 26,
+        output_b: 34,
+        probability: 0.0,
+    ),
+    // Salt + Ice -> Salt + Water (salt melts ice, de-icing)
+    (
+        name: "Salt melts Ice",
+        input_a: 26,
+        input_b: 10,
+        output_a: 34,
+        output_b: 3,
+        probability: 0.15,
+    ),
+
+    // === Superheated Steam Displacement ===
+    // Note: Superheated Steam + Stone and + Ice are in phase_change.ron.
+
+    // Superheated Steam + Water -> Steam + Steam
+    (
+        name: "Superheated Steam boils Water",
+        input_a: 150,
+        input_b: 3,
+        output_a: 7,
+        output_b: 7,
+        probability: 0.6,
+        temp_delta: -50,
+    ),
+    // Superheated Steam + Snow -> Steam + Water
+    (
+        name: "Superheated Steam melts Snow",
+        input_a: 150,
+        input_b: 33,
+        output_a: 7,
+        output_b: 3,
+        probability: 0.8,
+        temp_delta: -70,
+    ),
+    // Superheated Steam + Sand -> Steam + Sand (cools on contact)
+    (
+        name: "Superheated Steam cools on Sand",
+        input_a: 150,
+        input_b: 2,
+        output_a: 7,
+        output_b: 2,
+        probability: 0.3,
+        temp_delta: -40,
+    ),
+
+    // === Quicksilver (Alchemical Mercury) ===
+
+    // Quicksilver + Gold -> Quicksilver + Gold (amalgamation potential, inert for now)
+    (
+        name: "Quicksilver+Gold inert",
+        input_a: 216,
+        input_b: 52,
+        output_a: 216,
+        output_b: 52,
+        probability: 0.0,
+    ),
+    // Quicksilver + Silver -> Quicksilver + Silver (amalgamation potential, inert for now)
+    (
+        name: "Quicksilver+Silver inert",
+        input_a: 216,
+        input_b: 53,
+        output_a: 216,
+        output_b: 53,
+        probability: 0.0,
+    ),
+    // Quicksilver + Copper -> Quicksilver + Copper (inert)
+    (
+        name: "Quicksilver+Copper inert",
+        input_a: 216,
+        input_b: 51,
+        output_a: 216,
+        output_b: 51,
+        probability: 0.0,
+    ),
+    // Quicksilver + Water -> Quicksilver + Water (immiscible)
+    (
+        name: "Quicksilver+Water immiscible",
+        input_a: 216,
+        input_b: 3,
+        output_a: 216,
+        output_b: 3,
+        probability: 0.0,
+    ),
+
+    // === Transmutation (exotic alchemy) ===
+
+    // Transmutation Catalyst + Iron -> Transmutation Catalyst + Gold
+    (
+        name: "Catalyst transmutes Iron to Gold",
+        input_a: 231,
+        input_b: 50,
+        output_a: 231,
+        output_b: 52,
+        probability: 0.05,
+        min_temp: 500,
+    ),
+    // Transmutation Catalyst + Copper -> Transmutation Catalyst + Silver
+    (
+        name: "Catalyst transmutes Copper to Silver",
+        input_a: 231,
+        input_b: 51,
+        output_a: 231,
+        output_b: 53,
+        probability: 0.05,
+        min_temp: 500,
+    ),
+    // Transmutation Catalyst + Lead -> Transmutation Catalyst + Gold
+    (
+        name: "Catalyst transmutes Lead to Gold",
+        input_a: 231,
+        input_b: 56,
+        output_a: 231,
+        output_b: 52,
+        probability: 0.07,
+        min_temp: 450,
+    ),
+    // Philosopher's Stone + Iron -> Philosopher's Stone + Gold
+    (
+        name: "Philosopher Stone transmutes Iron",
+        input_a: 210,
+        input_b: 50,
+        output_a: 210,
+        output_b: 52,
+        probability: 0.1,
+        min_temp: 400,
+    ),
+    // Philosopher's Stone + Copper -> Philosopher's Stone + Gold
+    (
+        name: "Philosopher Stone transmutes Copper",
+        input_a: 210,
+        input_b: 51,
+        output_a: 210,
+        output_b: 52,
+        probability: 0.1,
+        min_temp: 400,
+    ),
+    // Philosopher's Stone + Lead -> Philosopher's Stone + Gold
+    (
+        name: "Philosopher Stone transmutes Lead",
+        input_a: 210,
+        input_b: 56,
+        output_a: 210,
+        output_b: 52,
+        probability: 0.1,
+        min_temp: 400,
+    ),
+    // Philosopher's Stone + Silver -> Philosopher's Stone + Gold
+    (
+        name: "Philosopher Stone transmutes Silver",
+        input_a: 210,
+        input_b: 53,
+        output_a: 210,
+        output_b: 52,
+        probability: 0.08,
+        min_temp: 400,
+    ),
+    // Philosopher's Stone + Aluminum -> Philosopher's Stone + Silver
+    (
+        name: "Philosopher Stone transmutes Aluminum",
+        input_a: 210,
+        input_b: 54,
+        output_a: 210,
+        output_b: 53,
+        probability: 0.08,
+        min_temp: 350,
+    ),
+    // Transmutation Catalyst + Sand -> Transmutation Catalyst + Salt (sand to salt)
+    (
+        name: "Catalyst transmutes Sand to Salt",
+        input_a: 231,
+        input_b: 2,
+        output_a: 231,
+        output_b: 26,
+        probability: 0.03,
+        min_temp: 300,
+    ),
+    // Transmutation Catalyst + Water -> Transmutation Catalyst + Water (inert)
+    (
+        name: "Catalyst+Water inert",
+        input_a: 231,
+        input_b: 3,
+        output_a: 231,
+        output_b: 3,
+        probability: 0.0,
+    ),
+]

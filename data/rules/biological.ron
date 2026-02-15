@@ -1,0 +1,774 @@
+[
+    // ============================================================================
+    // Biological Interaction Rules
+    // ============================================================================
+    // Covers: organic decay in water, fungal decomposition, moss/algae growth,
+    //         composting chains, decay spore effects, growth seed effects,
+    //         mud/soil interactions, and fermentation.
+    // ============================================================================
+
+    // === Organic Decay in Water (slow rotting) ===
+    // Note: Wood(8)+Water(3) is already defined as inert in combustion.ron.
+
+    // Water + Pine -> Water + Compost
+    (
+        name: "Water rots Pine",
+        input_a: 3,
+        input_b: 90,
+        output_a: 3,
+        output_b: 116,
+        probability: 0.02,
+    ),
+    // Water + Oak -> Water + Compost
+    (
+        name: "Water rots Oak",
+        input_a: 3,
+        input_b: 91,
+        output_a: 3,
+        output_b: 116,
+        probability: 0.015,
+    ),
+    // Water + Bamboo -> Water + Compost
+    (
+        name: "Water rots Bamboo",
+        input_a: 3,
+        input_b: 92,
+        output_a: 3,
+        output_b: 116,
+        probability: 0.025,
+    ),
+    // Water + Cork -> Water + Compost
+    (
+        name: "Water rots Cork",
+        input_a: 3,
+        input_b: 93,
+        output_a: 3,
+        output_b: 116,
+        probability: 0.03,
+    ),
+    // Water + Paper -> Water + Compost
+    (
+        name: "Water rots Paper",
+        input_a: 3,
+        input_b: 94,
+        output_a: 3,
+        output_b: 116,
+        probability: 0.05,
+    ),
+    // Water + Cloth -> Water + Compost
+    (
+        name: "Water rots Cloth",
+        input_a: 3,
+        input_b: 95,
+        output_a: 3,
+        output_b: 116,
+        probability: 0.03,
+    ),
+    // Water + Rope -> Water + Compost
+    (
+        name: "Water rots Rope",
+        input_a: 3,
+        input_b: 96,
+        output_a: 3,
+        output_b: 116,
+        probability: 0.025,
+    ),
+    // Water + Leather -> Water + Compost
+    (
+        name: "Water rots Leather",
+        input_a: 3,
+        input_b: 97,
+        output_a: 3,
+        output_b: 116,
+        probability: 0.01,
+    ),
+    // Water + Bark -> Water + Compost
+    (
+        name: "Water rots Bark",
+        input_a: 3,
+        input_b: 110,
+        output_a: 3,
+        output_b: 116,
+        probability: 0.02,
+    ),
+    // Water + Sawdust -> Water + Compost
+    (
+        name: "Water rots Sawdust",
+        input_a: 3,
+        input_b: 111,
+        output_a: 3,
+        output_b: 116,
+        probability: 0.04,
+    ),
+    // Water + Grain -> Water + Compost
+    (
+        name: "Water rots Grain",
+        input_a: 3,
+        input_b: 112,
+        output_a: 3,
+        output_b: 116,
+        probability: 0.05,
+    ),
+    // Water + Plant Fiber -> Water + Compost
+    (
+        name: "Water rots Plant Fiber",
+        input_a: 3,
+        input_b: 118,
+        output_a: 3,
+        output_b: 116,
+        probability: 0.03,
+    ),
+    // Water + Cotton -> Water + Compost
+    (
+        name: "Water rots Cotton",
+        input_a: 3,
+        input_b: 120,
+        output_a: 3,
+        output_b: 116,
+        probability: 0.025,
+    ),
+    // Water + Parchment -> Water + Compost
+    (
+        name: "Water rots Parchment",
+        input_a: 3,
+        input_b: 128,
+        output_a: 3,
+        output_b: 116,
+        probability: 0.04,
+    ),
+    // Water + Meat -> Water + Compost (meat rots fast in water)
+    (
+        name: "Water rots Meat",
+        input_a: 3,
+        input_b: 126,
+        output_a: 3,
+        output_b: 116,
+        probability: 0.08,
+    ),
+
+    // === Mold/Fungus Growth on Organic Matter ===
+
+    // Fungus + Wood -> Fungus + Compost
+    (
+        name: "Fungus decomposes Wood",
+        input_a: 109,
+        input_b: 8,
+        output_a: 109,
+        output_b: 116,
+        probability: 0.03,
+    ),
+    // Fungus + Pine -> Fungus + Compost
+    (
+        name: "Fungus decomposes Pine",
+        input_a: 109,
+        input_b: 90,
+        output_a: 109,
+        output_b: 116,
+        probability: 0.035,
+    ),
+    // Fungus + Oak -> Fungus + Compost
+    (
+        name: "Fungus decomposes Oak",
+        input_a: 109,
+        input_b: 91,
+        output_a: 109,
+        output_b: 116,
+        probability: 0.03,
+    ),
+    // Fungus + Paper -> Fungus + Compost
+    (
+        name: "Fungus decomposes Paper",
+        input_a: 109,
+        input_b: 94,
+        output_a: 109,
+        output_b: 116,
+        probability: 0.05,
+    ),
+    // Fungus + Cloth -> Fungus + Compost
+    (
+        name: "Fungus decomposes Cloth",
+        input_a: 109,
+        input_b: 95,
+        output_a: 109,
+        output_b: 116,
+        probability: 0.04,
+    ),
+    // Fungus + Leather -> Fungus + Compost
+    (
+        name: "Fungus decomposes Leather",
+        input_a: 109,
+        input_b: 97,
+        output_a: 109,
+        output_b: 116,
+        probability: 0.02,
+    ),
+    // Fungus + Bark -> Fungus + Compost
+    (
+        name: "Fungus decomposes Bark",
+        input_a: 109,
+        input_b: 110,
+        output_a: 109,
+        output_b: 116,
+        probability: 0.03,
+    ),
+    // Fungus + Sawdust -> Fungus + Compost
+    (
+        name: "Fungus decomposes Sawdust",
+        input_a: 109,
+        input_b: 111,
+        output_a: 109,
+        output_b: 116,
+        probability: 0.05,
+    ),
+    // Fungus + Grain -> Fungus + Compost
+    (
+        name: "Fungus decomposes Grain",
+        input_a: 109,
+        input_b: 112,
+        output_a: 109,
+        output_b: 116,
+        probability: 0.06,
+    ),
+    // Fungus + Sugar -> Fungus + Compost
+    (
+        name: "Fungus decomposes Sugar",
+        input_a: 109,
+        input_b: 113,
+        output_a: 109,
+        output_b: 116,
+        probability: 0.07,
+    ),
+    // Fungus + Flour -> Fungus + Compost
+    (
+        name: "Fungus decomposes Flour",
+        input_a: 109,
+        input_b: 114,
+        output_a: 109,
+        output_b: 116,
+        probability: 0.06,
+    ),
+    // Fungus + Plant Fiber -> Fungus + Compost
+    (
+        name: "Fungus decomposes Plant Fiber",
+        input_a: 109,
+        input_b: 118,
+        output_a: 109,
+        output_b: 116,
+        probability: 0.04,
+    ),
+    // Fungus + Cotton -> Fungus + Compost
+    (
+        name: "Fungus decomposes Cotton",
+        input_a: 109,
+        input_b: 120,
+        output_a: 109,
+        output_b: 116,
+        probability: 0.04,
+    ),
+    // Fungus + Meat -> Fungus + Toxic Gas (putrefaction)
+    (
+        name: "Fungus putrefies Meat",
+        input_a: 109,
+        input_b: 126,
+        output_a: 109,
+        output_b: 134,
+        probability: 0.05,
+    ),
+
+    // === Moss Growth (spreads slowly on damp surfaces) ===
+
+    // Moss + Water -> Moss + Moss (moss spreads with water)
+    (
+        name: "Moss spreads in Water",
+        input_a: 107,
+        input_b: 3,
+        output_a: 107,
+        output_b: 107,
+        probability: 0.02,
+    ),
+    // Moss + Dirt -> Moss + Topsoil (moss enriches dirt)
+    (
+        name: "Moss enriches Dirt",
+        input_a: 107,
+        input_b: 24,
+        output_a: 107,
+        output_b: 47,
+        probability: 0.03,
+    ),
+    // Moss + Clay -> Moss + Topsoil
+    (
+        name: "Moss enriches Clay",
+        input_a: 107,
+        input_b: 21,
+        output_a: 107,
+        output_b: 47,
+        probability: 0.02,
+    ),
+    // Moss + Gravel -> Moss + Dirt (moss slowly breaks down gravel)
+    (
+        name: "Moss weathers Gravel",
+        input_a: 107,
+        input_b: 22,
+        output_a: 107,
+        output_b: 24,
+        probability: 0.01,
+    ),
+    // Moss + Bark -> Moss + Compost (moss breaks down bark)
+    (
+        name: "Moss decomposes Bark",
+        input_a: 107,
+        input_b: 110,
+        output_a: 107,
+        output_b: 116,
+        probability: 0.02,
+    ),
+
+    // === Algae Growth (spreads in water) ===
+
+    // Algae + Water -> Algae + Algae (algae blooms in fresh water)
+    (
+        name: "Algae blooms in Water",
+        input_a: 108,
+        input_b: 3,
+        output_a: 108,
+        output_b: 108,
+        probability: 0.03,
+    ),
+    // Algae + Seawater -> Algae + Algae (algae thrives in seawater)
+    (
+        name: "Algae blooms in Seawater",
+        input_a: 108,
+        input_b: 35,
+        output_a: 108,
+        output_b: 108,
+        probability: 0.04,
+    ),
+    // Algae + Mud -> Algae + Compost (algae breaks down mud organics)
+    (
+        name: "Algae decomposes in Mud",
+        input_a: 108,
+        input_b: 23,
+        output_a: 108,
+        output_b: 116,
+        probability: 0.02,
+    ),
+
+    // === Composting Chains ===
+
+    // Compost + Water -> Humus + Water (water accelerates composting)
+    (
+        name: "Water matures Compost to Humus",
+        input_a: 116,
+        input_b: 3,
+        output_a: 117,
+        output_b: 3,
+        probability: 0.03,
+    ),
+    // Compost + Dirt -> Humus + Dirt (compost enriches over time)
+    (
+        name: "Compost matures in Dirt",
+        input_a: 116,
+        input_b: 24,
+        output_a: 117,
+        output_b: 24,
+        probability: 0.02,
+    ),
+    // Compost + Fungus -> Humus + Fungus (fungus accelerates composting)
+    (
+        name: "Fungus accelerates composting",
+        input_a: 116,
+        input_b: 109,
+        output_a: 117,
+        output_b: 109,
+        probability: 0.05,
+    ),
+    // Compost + Moss -> Humus + Moss (moss helps composting)
+    (
+        name: "Moss accelerates composting",
+        input_a: 116,
+        input_b: 107,
+        output_a: 117,
+        output_b: 107,
+        probability: 0.03,
+    ),
+    // Humus + Water -> Topsoil + Water (humus becomes rich soil)
+    (
+        name: "Water matures Humus to Topsoil",
+        input_a: 117,
+        input_b: 3,
+        output_a: 47,
+        output_b: 3,
+        probability: 0.02,
+    ),
+    // Humus + Dirt -> Topsoil + Dirt (humus enriches surrounding dirt)
+    (
+        name: "Humus enriches Dirt to Topsoil",
+        input_a: 117,
+        input_b: 24,
+        output_a: 47,
+        output_b: 24,
+        probability: 0.015,
+    ),
+
+    // === Decay Spore Effects (exotic biological accelerant) ===
+
+    // Decay Spore + Wood -> Decay Spore + Compost
+    (
+        name: "Decay Spore rots Wood",
+        input_a: 241,
+        input_b: 8,
+        output_a: 241,
+        output_b: 116,
+        probability: 0.1,
+    ),
+    // Decay Spore + Pine -> Decay Spore + Compost
+    (
+        name: "Decay Spore rots Pine",
+        input_a: 241,
+        input_b: 90,
+        output_a: 241,
+        output_b: 116,
+        probability: 0.12,
+    ),
+    // Decay Spore + Oak -> Decay Spore + Compost
+    (
+        name: "Decay Spore rots Oak",
+        input_a: 241,
+        input_b: 91,
+        output_a: 241,
+        output_b: 116,
+        probability: 0.1,
+    ),
+    // Decay Spore + Paper -> Decay Spore + Compost
+    (
+        name: "Decay Spore rots Paper",
+        input_a: 241,
+        input_b: 94,
+        output_a: 241,
+        output_b: 116,
+        probability: 0.15,
+    ),
+    // Decay Spore + Cloth -> Decay Spore + Compost
+    (
+        name: "Decay Spore rots Cloth",
+        input_a: 241,
+        input_b: 95,
+        output_a: 241,
+        output_b: 116,
+        probability: 0.12,
+    ),
+    // Decay Spore + Grain -> Decay Spore + Compost
+    (
+        name: "Decay Spore rots Grain",
+        input_a: 241,
+        input_b: 112,
+        output_a: 241,
+        output_b: 116,
+        probability: 0.15,
+    ),
+    // Decay Spore + Meat -> Decay Spore + Toxic Gas (accelerated putrefaction)
+    (
+        name: "Decay Spore putrefies Meat",
+        input_a: 241,
+        input_b: 126,
+        output_a: 241,
+        output_b: 134,
+        probability: 0.1,
+    ),
+    // Decay Spore + Leather -> Decay Spore + Compost
+    (
+        name: "Decay Spore rots Leather",
+        input_a: 241,
+        input_b: 97,
+        output_a: 241,
+        output_b: 116,
+        probability: 0.08,
+    ),
+    // Decay Spore + Bamboo -> Decay Spore + Compost
+    (
+        name: "Decay Spore rots Bamboo",
+        input_a: 241,
+        input_b: 92,
+        output_a: 241,
+        output_b: 116,
+        probability: 0.12,
+    ),
+    // Decay Spore + Rope -> Decay Spore + Compost
+    (
+        name: "Decay Spore rots Rope",
+        input_a: 241,
+        input_b: 96,
+        output_a: 241,
+        output_b: 116,
+        probability: 0.1,
+    ),
+    // Decay Spore + Cotton -> Decay Spore + Compost
+    (
+        name: "Decay Spore rots Cotton",
+        input_a: 241,
+        input_b: 120,
+        output_a: 241,
+        output_b: 116,
+        probability: 0.12,
+    ),
+    // Decay Spore + Parchment -> Decay Spore + Compost
+    (
+        name: "Decay Spore rots Parchment",
+        input_a: 241,
+        input_b: 128,
+        output_a: 241,
+        output_b: 116,
+        probability: 0.14,
+    ),
+
+    // === Growth Seed Effects (exotic biological catalyst) ===
+
+    // Growth Seed + Water -> Moss + Water (seed germinates in water)
+    (
+        name: "Growth Seed germinates in Water",
+        input_a: 240,
+        input_b: 3,
+        output_a: 107,
+        output_b: 3,
+        probability: 0.1,
+    ),
+    // Growth Seed + Dirt -> Moss + Topsoil (seed enriches soil)
+    (
+        name: "Growth Seed sprouts in Dirt",
+        input_a: 240,
+        input_b: 24,
+        output_a: 107,
+        output_b: 47,
+        probability: 0.1,
+    ),
+    // Growth Seed + Topsoil -> Plant Fiber + Topsoil (seed grows into plant)
+    (
+        name: "Growth Seed grows on Topsoil",
+        input_a: 240,
+        input_b: 47,
+        output_a: 118,
+        output_b: 47,
+        probability: 0.08,
+    ),
+    // Growth Seed + Compost -> Plant Fiber + Humus (seed thrives in compost)
+    (
+        name: "Growth Seed thrives in Compost",
+        input_a: 240,
+        input_b: 116,
+        output_a: 118,
+        output_b: 117,
+        probability: 0.1,
+    ),
+    // Growth Seed + Humus -> Plant Fiber + Topsoil (seed flourishes in humus)
+    (
+        name: "Growth Seed flourishes in Humus",
+        input_a: 240,
+        input_b: 117,
+        output_a: 118,
+        output_b: 47,
+        probability: 0.12,
+    ),
+    // Growth Seed + Mud -> Algae + Mud (seed spawns algae in wet substrate)
+    (
+        name: "Growth Seed spawns Algae in Mud",
+        input_a: 240,
+        input_b: 23,
+        output_a: 108,
+        output_b: 23,
+        probability: 0.08,
+    ),
+    // Growth Seed + Seawater -> Algae + Seawater (seed spawns marine algae)
+    (
+        name: "Growth Seed spawns Algae in Seawater",
+        input_a: 240,
+        input_b: 35,
+        output_a: 108,
+        output_b: 35,
+        probability: 0.1,
+    ),
+
+    // === Mud and Soil Interactions ===
+
+    // Water + Dirt -> Water + Mud (water saturates dirt)
+    (
+        name: "Water saturates Dirt to Mud",
+        input_a: 3,
+        input_b: 24,
+        output_a: 3,
+        output_b: 23,
+        probability: 0.1,
+    ),
+    // Water + Topsoil -> Water + Mud (water saturates topsoil)
+    (
+        name: "Water saturates Topsoil to Mud",
+        input_a: 3,
+        input_b: 47,
+        output_a: 3,
+        output_b: 23,
+        probability: 0.08,
+    ),
+    // Mud + Sand -> Clay + Sand (mud and sand form clay over time)
+    (
+        name: "Mud and Sand form Clay",
+        input_a: 23,
+        input_b: 2,
+        output_a: 21,
+        output_b: 2,
+        probability: 0.02,
+    ),
+    // Note: Ash+Water is already defined as inert in combustion.ron.
+
+    // Seawater + Dirt -> Seawater + Mud
+    (
+        name: "Seawater saturates Dirt to Mud",
+        input_a: 35,
+        input_b: 24,
+        output_a: 35,
+        output_b: 23,
+        probability: 0.1,
+    ),
+
+    // === Fermentation and Organic Chemistry ===
+
+    // Water + Sugar -> Water + Compost (sugar dissolves and ferments)
+    (
+        name: "Water ferments Sugar",
+        input_a: 3,
+        input_b: 113,
+        output_a: 3,
+        output_b: 116,
+        probability: 0.04,
+    ),
+    // Water + Flour -> Water + Compost (flour dissolves and spoils)
+    (
+        name: "Water spoils Flour",
+        input_a: 3,
+        input_b: 114,
+        output_a: 3,
+        output_b: 116,
+        probability: 0.04,
+    ),
+    // Fungus + Honey -> Fungus + Compost (honey ferments with fungus)
+    (
+        name: "Fungus ferments Honey",
+        input_a: 109,
+        input_b: 121,
+        output_a: 109,
+        output_b: 116,
+        probability: 0.01,
+    ),
+
+    // === Seawater Biological Decay ===
+
+    // Seawater + Paper -> Seawater + Compost (saltwater accelerates paper decay)
+    (
+        name: "Seawater rots Paper",
+        input_a: 35,
+        input_b: 94,
+        output_a: 35,
+        output_b: 116,
+        probability: 0.06,
+    ),
+    // Seawater + Cloth -> Seawater + Compost
+    (
+        name: "Seawater rots Cloth",
+        input_a: 35,
+        input_b: 95,
+        output_a: 35,
+        output_b: 116,
+        probability: 0.04,
+    ),
+    // Seawater + Rope -> Seawater + Compost
+    (
+        name: "Seawater rots Rope",
+        input_a: 35,
+        input_b: 96,
+        output_a: 35,
+        output_b: 116,
+        probability: 0.03,
+    ),
+    // Seawater + Wood -> Seawater + Compost (wood rots in saltwater)
+    (
+        name: "Seawater rots Wood",
+        input_a: 35,
+        input_b: 8,
+        output_a: 35,
+        output_b: 116,
+        probability: 0.015,
+    ),
+    // Seawater + Meat -> Seawater + Compost
+    (
+        name: "Seawater rots Meat",
+        input_a: 35,
+        input_b: 126,
+        output_a: 35,
+        output_b: 116,
+        probability: 0.06,
+    ),
+
+    // === Additional Biological Interactions ===
+
+    // Fungus + Parchment -> Fungus + Compost (parchment is organic, molds easily)
+    (
+        name: "Fungus decomposes Parchment",
+        input_a: 109,
+        input_b: 128,
+        output_a: 109,
+        output_b: 116,
+        probability: 0.045,
+    ),
+    // Water + Resin -> Water + Compost (resin slowly dissolves and decays)
+    (
+        name: "Water degrades Resin",
+        input_a: 3,
+        input_b: 103,
+        output_a: 3,
+        output_b: 116,
+        probability: 0.008,
+    ),
+    // Decay Spore + Bark -> Decay Spore + Compost
+    (
+        name: "Decay Spore rots Bark",
+        input_a: 241,
+        input_b: 110,
+        output_a: 241,
+        output_b: 116,
+        probability: 0.1,
+    ),
+    // Decay Spore + Sawdust -> Decay Spore + Compost
+    (
+        name: "Decay Spore rots Sawdust",
+        input_a: 241,
+        input_b: 111,
+        output_a: 241,
+        output_b: 116,
+        probability: 0.15,
+    ),
+    // Algae + Dirt -> Algae + Topsoil (algae enriches soil)
+    (
+        name: "Algae enriches Dirt",
+        input_a: 108,
+        input_b: 24,
+        output_a: 108,
+        output_b: 47,
+        probability: 0.02,
+    ),
+    // Decay Spore + Plant Fiber -> Decay Spore + Compost
+    (
+        name: "Decay Spore rots Plant Fiber",
+        input_a: 241,
+        input_b: 118,
+        output_a: 241,
+        output_b: 116,
+        probability: 0.12,
+    ),
+    // Fungus + Bamboo -> Fungus + Compost
+    (
+        name: "Fungus decomposes Bamboo",
+        input_a: 109,
+        input_b: 92,
+        output_a: 109,
+        output_b: 116,
+        probability: 0.035,
+    ),
+]

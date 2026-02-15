@@ -1,0 +1,1034 @@
+[
+    // =========================================================================
+    // ACID + METALS (Acid=166 corrodes metals)
+    // =========================================================================
+
+    // Reactive metals — acid dissolves or corrodes
+
+    // Iron corrodes to Rust
+    (
+        name: "Acid+Iron corrosion",
+        input_a: 166,
+        input_b: 50,
+        output_a: 166,
+        output_b: 77,
+        probability: 0.3,
+        temp_delta: 20,
+    ),
+    // Copper develops Patina
+    (
+        name: "Acid+Copper corrosion",
+        input_a: 166,
+        input_b: 51,
+        output_a: 166,
+        output_b: 78,
+        probability: 0.25,
+        temp_delta: 15,
+    ),
+    // Aluminum dissolves completely (very reactive with acid)
+    (
+        name: "Acid+Aluminum dissolution",
+        input_a: 166,
+        input_b: 54,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.4,
+        temp_delta: 30,
+    ),
+    // Zinc dissolves quickly (galvanic reactivity)
+    (
+        name: "Acid+Zinc dissolution",
+        input_a: 166,
+        input_b: 57,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.5,
+        temp_delta: 25,
+    ),
+    // Tin dissolves
+    (
+        name: "Acid+Tin dissolution",
+        input_a: 166,
+        input_b: 55,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.4,
+        temp_delta: 20,
+    ),
+    // Lead dissolves slowly
+    (
+        name: "Acid+Lead dissolution",
+        input_a: 166,
+        input_b: 56,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.3,
+        temp_delta: 15,
+    ),
+    // Nickel dissolves slowly
+    (
+        name: "Acid+Nickel dissolution",
+        input_a: 166,
+        input_b: 58,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.2,
+        temp_delta: 20,
+    ),
+    // Magnesium — very reactive, violent dissolution with heat
+    (
+        name: "Acid+Magnesium dissolution",
+        input_a: 166,
+        input_b: 63,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.6,
+        temp_delta: 40,
+    ),
+    // Sodium — extremely reactive
+    (
+        name: "Acid+Sodium dissolution",
+        input_a: 166,
+        input_b: 64,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.7,
+        temp_delta: 50,
+    ),
+    // Potassium — extremely reactive
+    (
+        name: "Acid+Potassium dissolution",
+        input_a: 166,
+        input_b: 65,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.7,
+        temp_delta: 55,
+    ),
+    // Steel corrodes to Rust (slower than pure iron)
+    (
+        name: "Acid+Steel corrosion",
+        input_a: 166,
+        input_b: 68,
+        output_a: 166,
+        output_b: 77,
+        probability: 0.2,
+        temp_delta: 15,
+    ),
+    // Cast Iron corrodes to Rust
+    (
+        name: "Acid+Cast Iron corrosion",
+        input_a: 166,
+        input_b: 70,
+        output_a: 166,
+        output_b: 77,
+        probability: 0.25,
+        temp_delta: 18,
+    ),
+    // Bronze develops Patina
+    (
+        name: "Acid+Bronze corrosion",
+        input_a: 166,
+        input_b: 66,
+        output_a: 166,
+        output_b: 78,
+        probability: 0.2,
+        temp_delta: 12,
+    ),
+    // Brass develops Patina
+    (
+        name: "Acid+Brass corrosion",
+        input_a: 166,
+        input_b: 67,
+        output_a: 166,
+        output_b: 78,
+        probability: 0.2,
+        temp_delta: 12,
+    ),
+    // Wire dissolves (thin copper form)
+    (
+        name: "Acid+Wire dissolution",
+        input_a: 166,
+        input_b: 84,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.3,
+        temp_delta: 15,
+    ),
+    // Foil dissolves quickly (thin aluminum form)
+    (
+        name: "Acid+Foil dissolution",
+        input_a: 166,
+        input_b: 85,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.5,
+        temp_delta: 20,
+    ),
+    // Solder dissolves (tin-lead alloy)
+    (
+        name: "Acid+Solder dissolution",
+        input_a: 166,
+        input_b: 76,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.4,
+        temp_delta: 18,
+    ),
+    // Alloy corrodes to Slag
+    (
+        name: "Acid+Alloy corrosion",
+        input_a: 166,
+        input_b: 87,
+        output_a: 166,
+        output_b: 79,
+        probability: 0.2,
+        temp_delta: 15,
+    ),
+    // Filings dissolve quickly (high surface area)
+    (
+        name: "Acid+Filings dissolution",
+        input_a: 166,
+        input_b: 86,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.6,
+        temp_delta: 25,
+    ),
+    // Silver dissolves slowly
+    (
+        name: "Acid+Silver dissolution",
+        input_a: 166,
+        input_b: 53,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.15,
+        temp_delta: 10,
+    ),
+    // Cobalt dissolves
+    (
+        name: "Acid+Cobalt dissolution",
+        input_a: 166,
+        input_b: 62,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.2,
+        temp_delta: 18,
+    ),
+    // Chromium dissolves slowly
+    (
+        name: "Acid+Chromium dissolution",
+        input_a: 166,
+        input_b: 61,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.1,
+        temp_delta: 12,
+    ),
+
+    // Acid-resistant metals — inert reactions (prob 0.0)
+
+    // Gold resists most acids
+    (
+        name: "Acid+Gold inert",
+        input_a: 166,
+        input_b: 52,
+        output_a: 166,
+        output_b: 52,
+        probability: 0.0,
+    ),
+    // Platinum resists acid
+    (
+        name: "Acid+Platinum inert",
+        input_a: 166,
+        input_b: 89,
+        output_a: 166,
+        output_b: 89,
+        probability: 0.0,
+    ),
+    // Titanium resists acid (passive oxide layer)
+    (
+        name: "Acid+Titanium inert",
+        input_a: 166,
+        input_b: 59,
+        output_a: 166,
+        output_b: 59,
+        probability: 0.0,
+    ),
+    // Stainless Steel resists acid (chromium oxide layer)
+    (
+        name: "Acid+Stainless Steel inert",
+        input_a: 166,
+        input_b: 69,
+        output_a: 166,
+        output_b: 69,
+        probability: 0.0,
+    ),
+    // Tungsten resists acid
+    (
+        name: "Acid+Tungsten inert",
+        input_a: 166,
+        input_b: 60,
+        output_a: 166,
+        output_b: 60,
+        probability: 0.0,
+    ),
+
+    // =========================================================================
+    // ACID + ORES (acid dissolves ores faster than pure metals)
+    // =========================================================================
+
+    // Iron Ore dissolves
+    (
+        name: "Acid+Iron Ore dissolution",
+        input_a: 166,
+        input_b: 80,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.35,
+        temp_delta: 15,
+    ),
+    // Copper Ore dissolves
+    (
+        name: "Acid+Copper Ore dissolution",
+        input_a: 166,
+        input_b: 81,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.3,
+        temp_delta: 12,
+    ),
+    // Gold Ore — mostly inert (gold content protects)
+    (
+        name: "Acid+Gold Ore inert",
+        input_a: 166,
+        input_b: 82,
+        output_a: 166,
+        output_b: 82,
+        probability: 0.0,
+    ),
+    // Tin Ore dissolves
+    (
+        name: "Acid+Tin Ore dissolution",
+        input_a: 166,
+        input_b: 83,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.35,
+        temp_delta: 12,
+    ),
+
+    // =========================================================================
+    // ACID + STONE / MINERALS
+    // =========================================================================
+
+    // Limestone fizzes and dissolves (calcium carbonate + acid)
+    (
+        name: "Acid+Limestone dissolution",
+        input_a: 166,
+        input_b: 18,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.5,
+        temp_delta: 15,
+    ),
+    // Chalk dissolves quickly (soft calcium carbonate)
+    (
+        name: "Acid+Chalk dissolution",
+        input_a: 166,
+        input_b: 29,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.6,
+        temp_delta: 12,
+    ),
+    // Marble dissolves (metamorphic limestone)
+    (
+        name: "Acid+Marble dissolution",
+        input_a: 166,
+        input_b: 19,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.4,
+        temp_delta: 15,
+    ),
+    // Calcium dissolves with heat
+    (
+        name: "Acid+Calcium dissolution",
+        input_a: 166,
+        input_b: 38,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.5,
+        temp_delta: 20,
+    ),
+    // Limestone Dust dissolves rapidly (high surface area powder)
+    (
+        name: "Acid+Limestone Dust dissolution",
+        input_a: 166,
+        input_b: 48,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.7,
+        temp_delta: 10,
+    ),
+    // Concrete etches to Sand (aggregate exposed)
+    (
+        name: "Acid+Concrete etching",
+        input_a: 166,
+        input_b: 170,
+        output_a: 166,
+        output_b: 2,
+        probability: 0.2,
+        temp_delta: 10,
+    ),
+    // Plaster dissolves
+    (
+        name: "Acid+Plaster dissolution",
+        input_a: 166,
+        input_b: 190,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.5,
+        temp_delta: 8,
+    ),
+    // Brick etches slowly to Sand
+    (
+        name: "Acid+Brick etching",
+        input_a: 166,
+        input_b: 173,
+        output_a: 166,
+        output_b: 2,
+        probability: 0.1,
+        temp_delta: 8,
+    ),
+    // Sandstone etches to Sand
+    (
+        name: "Acid+Sandstone etching",
+        input_a: 166,
+        input_b: 20,
+        output_a: 166,
+        output_b: 2,
+        probability: 0.15,
+        temp_delta: 8,
+    ),
+    // Coral dissolves (calcium carbonate skeleton)
+    (
+        name: "Acid+Coral dissolution",
+        input_a: 166,
+        input_b: 32,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.45,
+        temp_delta: 12,
+    ),
+    // Shell dissolves (calcium carbonate)
+    (
+        name: "Acid+Shell dissolution",
+        input_a: 166,
+        input_b: 99,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.4,
+        temp_delta: 10,
+    ),
+    // Bone dissolves slowly
+    (
+        name: "Acid+Bone dissolution",
+        input_a: 166,
+        input_b: 98,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.25,
+        temp_delta: 8,
+    ),
+    // Cement dissolves
+    (
+        name: "Acid+Cement dissolution",
+        input_a: 166,
+        input_b: 171,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.3,
+        temp_delta: 10,
+    ),
+    // Mortar dissolves
+    (
+        name: "Acid+Mortar dissolution",
+        input_a: 166,
+        input_b: 172,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.35,
+        temp_delta: 10,
+    ),
+
+    // Acid-resistant minerals — inert
+
+    // Glass resists most acids
+    (
+        name: "Acid+Glass inert",
+        input_a: 166,
+        input_b: 14,
+        output_a: 166,
+        output_b: 14,
+        probability: 0.0,
+    ),
+    // Quartz resists acid (silicon dioxide)
+    (
+        name: "Acid+Quartz inert",
+        input_a: 166,
+        input_b: 31,
+        output_a: 166,
+        output_b: 31,
+        probability: 0.0,
+    ),
+    // Obsidian resists acid (volcanic glass)
+    (
+        name: "Acid+Obsidian inert",
+        input_a: 166,
+        input_b: 27,
+        output_a: 166,
+        output_b: 27,
+        probability: 0.0,
+    ),
+    // Granite resists acid (mostly quartz/feldspar)
+    (
+        name: "Acid+Granite inert",
+        input_a: 166,
+        input_b: 16,
+        output_a: 166,
+        output_b: 16,
+        probability: 0.0,
+    ),
+    // Stone has very slow etching
+    (
+        name: "Acid+Stone slow etch",
+        input_a: 166,
+        input_b: 1,
+        output_a: 166,
+        output_b: 2,
+        probability: 0.05,
+        temp_delta: 5,
+    ),
+
+    // =========================================================================
+    // ACID + ORGANICS
+    // =========================================================================
+
+    // Paper dissolves rapidly
+    (
+        name: "Acid+Paper dissolution",
+        input_a: 166,
+        input_b: 94,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.7,
+        temp_delta: 5,
+    ),
+    // Cloth dissolves
+    (
+        name: "Acid+Cloth dissolution",
+        input_a: 166,
+        input_b: 95,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.6,
+        temp_delta: 5,
+    ),
+    // Silk dissolves
+    (
+        name: "Acid+Silk dissolution",
+        input_a: 166,
+        input_b: 119,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.65,
+        temp_delta: 5,
+    ),
+    // Cotton dissolves
+    (
+        name: "Acid+Cotton dissolution",
+        input_a: 166,
+        input_b: 120,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.6,
+        temp_delta: 5,
+    ),
+    // Rubber dissolves slowly (more resistant)
+    (
+        name: "Acid+Rubber dissolution",
+        input_a: 166,
+        input_b: 104,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.3,
+        temp_delta: 8,
+    ),
+    // Pine dissolves slowly (wood)
+    (
+        name: "Acid+Pine dissolution",
+        input_a: 166,
+        input_b: 90,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.2,
+        temp_delta: 8,
+    ),
+    // Oak dissolves slower (denser wood)
+    (
+        name: "Acid+Oak dissolution",
+        input_a: 166,
+        input_b: 91,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.15,
+        temp_delta: 8,
+    ),
+    // Wax dissolves
+    (
+        name: "Acid+Wax dissolution",
+        input_a: 166,
+        input_b: 100,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.4,
+        temp_delta: 5,
+    ),
+    // Plastic produces Toxic Gas (chemical decomposition)
+    (
+        name: "Acid+Plastic toxic decomposition",
+        input_a: 166,
+        input_b: 178,
+        output_a: 166,
+        output_b: 134,
+        probability: 0.2,
+        temp_delta: 10,
+    ),
+    // Leather dissolves
+    (
+        name: "Acid+Leather dissolution",
+        input_a: 166,
+        input_b: 97,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.35,
+        temp_delta: 6,
+    ),
+    // Rope dissolves
+    (
+        name: "Acid+Rope dissolution",
+        input_a: 166,
+        input_b: 96,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.5,
+        temp_delta: 5,
+    ),
+    // Parchment dissolves rapidly
+    (
+        name: "Acid+Parchment dissolution",
+        input_a: 166,
+        input_b: 128,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.65,
+        temp_delta: 5,
+    ),
+    // Cork dissolves
+    (
+        name: "Acid+Cork dissolution",
+        input_a: 166,
+        input_b: 93,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.3,
+        temp_delta: 6,
+    ),
+    // Bamboo dissolves (similar to wood)
+    (
+        name: "Acid+Bamboo dissolution",
+        input_a: 166,
+        input_b: 92,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.2,
+        temp_delta: 8,
+    ),
+    // Moss dissolves quickly (soft plant matter)
+    (
+        name: "Acid+Moss dissolution",
+        input_a: 166,
+        input_b: 107,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.55,
+        temp_delta: 4,
+    ),
+    // Meat dissolves
+    (
+        name: "Acid+Meat dissolution",
+        input_a: 166,
+        input_b: 126,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.5,
+        temp_delta: 8,
+    ),
+
+    // =========================================================================
+    // ACID + SYNTHETICS
+    // =========================================================================
+
+    // PVC produces Toxic Gas (releases chlorine compounds)
+    (
+        name: "Acid+PVC toxic decomposition",
+        input_a: 166,
+        input_b: 180,
+        output_a: 166,
+        output_b: 134,
+        probability: 0.15,
+        temp_delta: 12,
+    ),
+    // Nylon dissolves
+    (
+        name: "Acid+Nylon dissolution",
+        input_a: 166,
+        input_b: 181,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.35,
+        temp_delta: 8,
+    ),
+    // Foam dissolves quickly
+    (
+        name: "Acid+Foam dissolution",
+        input_a: 166,
+        input_b: 184,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.6,
+        temp_delta: 5,
+    ),
+    // Styrofoam dissolves extremely quickly
+    (
+        name: "Acid+Styrofoam dissolution",
+        input_a: 166,
+        input_b: 185,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.7,
+        temp_delta: 5,
+    ),
+    // Drywall dissolves (gypsum-based)
+    (
+        name: "Acid+Drywall dissolution",
+        input_a: 166,
+        input_b: 191,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.45,
+        temp_delta: 6,
+    ),
+
+    // Acid-resistant synthetics
+
+    // Teflon resists acid (chemically inert polymer)
+    (
+        name: "Acid+Teflon inert",
+        input_a: 166,
+        input_b: 182,
+        output_a: 166,
+        output_b: 182,
+        probability: 0.0,
+    ),
+
+    // =========================================================================
+    // ACID + ENERGY / SPECIAL INTERACTIONS
+    // =========================================================================
+
+    // Acid near Fire produces Acid Fumes
+    (
+        name: "Acid+Fire fuming",
+        input_a: 166,
+        input_b: 5,
+        output_a: 154,
+        output_b: 5,
+        probability: 0.5,
+        temp_delta: -20,
+    ),
+    // Acid + Lava — acid boils off to fumes
+    (
+        name: "Acid+Lava boiloff",
+        input_a: 166,
+        input_b: 11,
+        output_a: 154,
+        output_b: 11,
+        probability: 0.8,
+        temp_delta: -30,
+    ),
+    // Acid + Salt — neutralization reaction
+    (
+        name: "Acid+Salt neutralization",
+        input_a: 166,
+        input_b: 26,
+        output_a: 3,
+        output_b: 0,
+        probability: 0.4,
+        temp_delta: 15,
+    ),
+    // Acid + Sulfur — slow reaction
+    (
+        name: "Acid+Sulfur reaction",
+        input_a: 166,
+        input_b: 39,
+        output_a: 166,
+        output_b: 134,
+        probability: 0.15,
+        temp_delta: 10,
+    ),
+
+    // =========================================================================
+    // WATER DISSOLUTION (Water=3 dissolves soluble materials)
+    // =========================================================================
+
+    // Salt dissolves in water
+    (
+        name: "Water+Salt dissolution",
+        input_a: 3,
+        input_b: 26,
+        output_a: 3,
+        output_b: 3,
+        probability: 0.3,
+    ),
+    // Sugar dissolves in water
+    (
+        name: "Water+Sugar dissolution",
+        input_a: 3,
+        input_b: 113,
+        output_a: 3,
+        output_b: 3,
+        probability: 0.4,
+    ),
+    // Starch dissolves slowly in water
+    (
+        name: "Water+Starch dissolution",
+        input_a: 3,
+        input_b: 115,
+        output_a: 3,
+        output_b: 3,
+        probability: 0.2,
+    ),
+    // Soap dissolves in water
+    (
+        name: "Water+Soap dissolution",
+        input_a: 3,
+        input_b: 127,
+        output_a: 3,
+        output_b: 3,
+        probability: 0.5,
+    ),
+    // Chalk slowly dissolves in water
+    (
+        name: "Water+Chalk dissolution",
+        input_a: 3,
+        input_b: 29,
+        output_a: 3,
+        output_b: 3,
+        probability: 0.1,
+    ),
+    // Limestone Dust dissolves in water
+    (
+        name: "Water+Limestone Dust dissolution",
+        input_a: 3,
+        input_b: 48,
+        output_a: 3,
+        output_b: 3,
+        probability: 0.15,
+    ),
+    // Ash dissolves in water (lye/potash)
+    (
+        name: "Water+Ash dissolution",
+        input_a: 3,
+        input_b: 9,
+        output_a: 3,
+        output_b: 3,
+        probability: 0.2,
+    ),
+    // Flour dissolves in water
+    (
+        name: "Water+Flour dissolution",
+        input_a: 3,
+        input_b: 114,
+        output_a: 3,
+        output_b: 3,
+        probability: 0.25,
+    ),
+
+    // Water-insoluble materials
+
+    // Charcoal does not dissolve in water
+    (
+        name: "Water+Charcoal inert",
+        input_a: 3,
+        input_b: 105,
+        output_a: 3,
+        output_b: 105,
+        probability: 0.0,
+    ),
+
+    // =========================================================================
+    // WATER + REACTIVE MATERIALS
+    // =========================================================================
+
+    // Water + Calcium — exothermic, produces calcium hydroxide (Limestone Dust as proxy)
+    (
+        name: "Water+Calcium reaction",
+        input_a: 3,
+        input_b: 38,
+        output_a: 3,
+        output_b: 48,
+        probability: 0.2,
+        temp_delta: 30,
+    ),
+
+    // =========================================================================
+    // WATER CORROSION (slow oxidation over time)
+    // =========================================================================
+
+    // Water + Iron — slow rust formation
+    (
+        name: "Water+Iron rusting",
+        input_a: 3,
+        input_b: 50,
+        output_a: 3,
+        output_b: 77,
+        probability: 0.05,
+    ),
+    // Water + Steel — very slow rust
+    (
+        name: "Water+Steel rusting",
+        input_a: 3,
+        input_b: 68,
+        output_a: 3,
+        output_b: 77,
+        probability: 0.03,
+    ),
+    // Water + Cast Iron — slow rust
+    (
+        name: "Water+Cast Iron rusting",
+        input_a: 3,
+        input_b: 70,
+        output_a: 3,
+        output_b: 77,
+        probability: 0.04,
+    ),
+    // Water + Copper — very slow patina
+    (
+        name: "Water+Copper patina",
+        input_a: 3,
+        input_b: 51,
+        output_a: 3,
+        output_b: 78,
+        probability: 0.02,
+    ),
+    // Water + Bronze — very slow patina
+    (
+        name: "Water+Bronze patina",
+        input_a: 3,
+        input_b: 66,
+        output_a: 3,
+        output_b: 78,
+        probability: 0.02,
+    ),
+    // Water + Brass — very slow patina
+    (
+        name: "Water+Brass patina",
+        input_a: 3,
+        input_b: 67,
+        output_a: 3,
+        output_b: 78,
+        probability: 0.02,
+    ),
+    // Water + Wire — slow corrosion
+    (
+        name: "Water+Wire corrosion",
+        input_a: 3,
+        input_b: 84,
+        output_a: 3,
+        output_b: 78,
+        probability: 0.02,
+    ),
+    // Water + Foil — corrodes (thin material)
+    (
+        name: "Water+Foil corrosion",
+        input_a: 3,
+        input_b: 85,
+        output_a: 3,
+        output_b: 77,
+        probability: 0.03,
+    ),
+    // Water + Filings — rapid rust (powder, high surface area)
+    (
+        name: "Water+Filings rusting",
+        input_a: 3,
+        input_b: 86,
+        output_a: 3,
+        output_b: 77,
+        probability: 0.08,
+    ),
+    // Water + Plaster — slow dissolution (gypsum dissolves)
+    (
+        name: "Water+Plaster dissolution",
+        input_a: 3,
+        input_b: 190,
+        output_a: 3,
+        output_b: 3,
+        probability: 0.08,
+    ),
+    // Water + Solder — slow corrosion
+    (
+        name: "Water+Solder corrosion",
+        input_a: 3,
+        input_b: 76,
+        output_a: 3,
+        output_b: 77,
+        probability: 0.02,
+    ),
+
+    // =========================================================================
+    // ACID + ADDITIONAL MATERIALS
+    // =========================================================================
+
+    // Acid + Clay — dissolves calcium compounds in clay
+    (
+        name: "Acid+Clay dissolution",
+        input_a: 166,
+        input_b: 21,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.3,
+        temp_delta: 8,
+    ),
+    // Acid + Sawdust — dissolves rapidly (high surface area organic)
+    (
+        name: "Acid+Sawdust dissolution",
+        input_a: 166,
+        input_b: 111,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.6,
+        temp_delta: 5,
+    ),
+    // Acid + Mercury — acid reacts with liquid mercury
+    (
+        name: "Acid+Mercury reaction",
+        input_a: 166,
+        input_b: 88,
+        output_a: 166,
+        output_b: 134,
+        probability: 0.15,
+        temp_delta: 10,
+    ),
+]
