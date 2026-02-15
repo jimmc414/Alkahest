@@ -59,6 +59,7 @@ pub struct SimPipeline {
     tick_count: u64,
     paused: bool,
     single_step_requested: bool,
+    rule_hash: u64,
 }
 
 impl SimPipeline {
@@ -392,6 +393,7 @@ impl SimPipeline {
             tick_count: 0,
             paused: false,
             single_step_requested: false,
+            rule_hash: rule_data.rule_hash,
         }
     }
 
@@ -777,5 +779,20 @@ impl SimPipeline {
 
     pub fn tick_count(&self) -> u64 {
         self.tick_count
+    }
+
+    /// Get the rule set hash for save/load compatibility checking.
+    pub fn rule_hash(&self) -> u64 {
+        self.rule_hash
+    }
+
+    /// Set the tick count (used when loading a save file).
+    pub fn set_tick_count(&mut self, tick: u64) {
+        self.tick_count = tick;
+    }
+
+    /// Get mutable access to the chunk pool (for save/load upload).
+    pub fn chunk_pool_mut(&mut self) -> &mut ChunkPool {
+        &mut self.chunk_pool
     }
 }

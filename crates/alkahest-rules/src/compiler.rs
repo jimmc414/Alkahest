@@ -1,3 +1,5 @@
+use std::hash::{Hash, Hasher};
+
 use alkahest_core::constants::NO_RULE;
 use alkahest_core::material::MaterialTable;
 use alkahest_core::math::temp_to_quantized;
@@ -26,6 +28,8 @@ pub struct GpuRuleData {
     pub rule_count: u32,
     /// Material colors extracted from material definitions for the renderer.
     pub material_colors: Vec<CompiledMaterialColor>,
+    /// Deterministic hash of the rule set for save/load compatibility checking.
+    pub rule_hash: u64,
 }
 
 /// GPU material property layout: 3x vec4<f32> = 48 bytes per material.
@@ -69,6 +73,52 @@ struct GpuRuleEntry {
     _unused2: u32,
     min_temp: u32,
     max_temp: u32,
+}
+
+/// Compute a deterministic hash from material definitions and interaction rules.
+///
+/// Materials are sorted by ID, rules by (input_a, input_b). All numeric fields
+/// are hashed to detect any change that could affect simulation behavior.
+pub fn compute_rule_hash(materials: &MaterialTable, rules: &RuleSet) -> u64 {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+
+    // Sort materials by ID for determinism
+    let mut sorted_mats: Vec<_> = materials.materials.iter().collect();
+    sorted_mats.sort_by_key(|m| m.id);
+
+    for mat in &sorted_mats {
+        mat.id.hash(&mut hasher);
+        (mat.phase as u8).hash(&mut hasher);
+        mat.density.to_bits().hash(&mut hasher);
+        mat.flammability.to_bits().hash(&mut hasher);
+        mat.ignition_temp.to_bits().hash(&mut hasher);
+        mat.decay_rate.hash(&mut hasher);
+        mat.decay_threshold.hash(&mut hasher);
+        mat.decay_product.hash(&mut hasher);
+        mat.viscosity.to_bits().hash(&mut hasher);
+        mat.thermal_conductivity.to_bits().hash(&mut hasher);
+        mat.phase_change_temp.to_bits().hash(&mut hasher);
+        mat.phase_change_product.hash(&mut hasher);
+        mat.structural_integrity.to_bits().hash(&mut hasher);
+    }
+
+    // Sort rules by (input_a, input_b) for determinism
+    let mut sorted_rules: Vec<_> = rules.rules.iter().collect();
+    sorted_rules.sort_by_key(|r| (r.input_a, r.input_b));
+
+    for rule in &sorted_rules {
+        rule.input_a.hash(&mut hasher);
+        rule.input_b.hash(&mut hasher);
+        rule.output_a.hash(&mut hasher);
+        rule.output_b.hash(&mut hasher);
+        rule.probability.to_bits().hash(&mut hasher);
+        rule.temp_delta.hash(&mut hasher);
+        rule.min_temp.hash(&mut hasher);
+        rule.max_temp.hash(&mut hasher);
+        rule.pressure_delta.hash(&mut hasher);
+    }
+
+    hasher.finish()
 }
 
 /// Compile material and rule data into GPU buffers.
@@ -220,6 +270,8 @@ pub fn compile(device: &wgpu::Device, materials: &MaterialTable, rules: &RuleSet
         }
     }
 
+    let rule_hash = compute_rule_hash(materials, rules);
+
     GpuRuleData {
         material_props_buffer,
         rule_lookup_buffer,
@@ -227,5 +279,98 @@ pub fn compile(device: &wgpu::Device, materials: &MaterialTable, rules: &RuleSet
         material_count,
         rule_count: rule_entries.len() as u32,
         material_colors,
+        rule_hash,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alkahest_core::material::{MaterialDef, MaterialTable, Phase};
+    use alkahest_core::rule::{InteractionRule, RuleSet};
+
+    fn test_materials() -> MaterialTable {
+        MaterialTable {
+            materials: vec![
+                MaterialDef {
+                    id: 0,
+                    name: "Air".into(),
+                    phase: Phase::Gas,
+                    density: 0.0,
+                    color: (0.0, 0.0, 0.0),
+                    emission: 0.0,
+                    flammability: 0.0,
+                    ignition_temp: 0.0,
+                    decay_rate: 0,
+                    decay_threshold: 0,
+                    decay_product: 0,
+                    viscosity: 0.0,
+                    thermal_conductivity: 0.0,
+                    phase_change_temp: 0.0,
+                    phase_change_product: 0,
+                    structural_integrity: 0.0,
+                },
+                MaterialDef {
+                    id: 1,
+                    name: "Stone".into(),
+                    phase: Phase::Solid,
+                    density: 2500.0,
+                    color: (0.5, 0.5, 0.5),
+                    emission: 0.0,
+                    flammability: 0.0,
+                    ignition_temp: 0.0,
+                    decay_rate: 0,
+                    decay_threshold: 0,
+                    decay_product: 0,
+                    viscosity: 0.0,
+                    thermal_conductivity: 0.5,
+                    phase_change_temp: 0.0,
+                    phase_change_product: 0,
+                    structural_integrity: 63.0,
+                },
+            ],
+        }
+    }
+
+    fn test_rules() -> RuleSet {
+        RuleSet {
+            rules: vec![InteractionRule {
+                name: "test".into(),
+                input_a: 0,
+                input_b: 1,
+                output_a: 0,
+                output_b: 1,
+                probability: 0.5,
+                temp_delta: 0,
+                min_temp: 0,
+                max_temp: 0,
+                pressure_delta: 0,
+            }],
+        }
+    }
+
+    #[test]
+    fn test_rule_hash_deterministic() {
+        let materials = test_materials();
+        let rules = test_rules();
+
+        let hash1 = compute_rule_hash(&materials, &rules);
+        let hash2 = compute_rule_hash(&materials, &rules);
+        assert_eq!(hash1, hash2, "same input should produce same hash");
+    }
+
+    #[test]
+    fn test_rule_hash_changes_on_modification() {
+        let materials = test_materials();
+        let rules1 = test_rules();
+        let mut rules2 = test_rules();
+        rules2.rules[0].probability = 0.9;
+
+        let hash1 = compute_rule_hash(&materials, &rules1);
+        let hash2 = compute_rule_hash(&materials, &rules2);
+        assert_ne!(
+            hash1, hash2,
+            "different rules should produce different hash"
+        );
     }
 }
