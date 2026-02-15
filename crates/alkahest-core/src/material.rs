@@ -32,6 +32,7 @@ pub struct MaterialDef {
     /// RGB color (0.0–1.0 per channel).
     pub color: (f32, f32, f32),
     /// Emission intensity for rendering (0.0 = none, 5.0 = bright glow).
+    #[serde(default)]
     pub emission: f32,
     /// Flammability (0.0 = fireproof, 1.0 = highly flammable).
     #[serde(default)]
