@@ -1,5 +1,30 @@
 [
-    // === Combustion reactions ===
+    // =========================================================================
+    // === COMBUSTION RULES ===
+    // =========================================================================
+    // Pairwise interaction rules for combustion, ignition, and fire behavior.
+    // Each (input_a, input_b) pair is unique across the entire file.
+    //
+    // Material ID quick reference:
+    //   0:Air  1:Stone  2:Sand  3:Water  4:Oil  5:Fire  6:Smoke  7:Steam
+    //   8:Wood  9:Ash  11:Lava  12:Gunpowder  25:Peat  36:Tar  37:Bitumen
+    //   39:Sulfur  45:Hydrogen  64:Sodium  65:Potassium  86:Filings
+    //   90:Pine  91:Oak  92:Bamboo  93:Cork  94:Paper  95:Cloth  96:Rope
+    //   97:Leather  98:Bone  99:Shell  100:Wax  101:Fat  102:Tallow
+    //   103:Resin  104:Rubber  105:Charcoal  106:Coal  107:Moss  108:Algae
+    //   109:Fungus  110:Bark  111:Sawdust  112:Grain  113:Sugar  114:Flour
+    //   115:Starch  116:Compost  117:Humus  118:PlantFiber  119:Silk
+    //   120:Cotton  121:Honey  122:Vinegar  123:Alcohol  124:Dye  125:Ink
+    //   126:Meat  127:Soap  128:Parchment  129:CharcoalDust
+    //   130:Plasma  131:Spark  132:Ember  133:Cinder  134:ToxicGas
+    //   136:Methane  137:Propane  138:NaturalGas  139:BlueFlame  140:GreenFlame
+    //   160:Napalm  161:GreekFire  164:Inferno  165:Wildfire  167:Soot  168:Coke
+    //   178:Plastic  179:Polyethylene  180:PVC  181:Nylon  184:Foam
+    //   185:Styrofoam  189:Asphalt  198:Paint  199:Varnish  200:Lacquer
+    //   206:Plexiglass  209:SyntheticRubber  233:EnchantedWood
+    // =========================================================================
+
+    // === Combustion reactions (original) ===
     // Fire + Wood -> Fire + Ash (wood burns to ash)
     (
         name: "Fire+Wood combustion",
@@ -21,7 +46,7 @@
         temp_delta: 100,
     ),
 
-    // === Extinguishing reactions ===
+    // === Extinguishing reactions (original) ===
     // Fire + Water -> Air + Steam (water puts out fire)
     (
         name: "Fire+Water extinguish",
@@ -32,7 +57,7 @@
         probability: 1.0,
     ),
 
-    // === Cooling reactions ===
+    // === Cooling reactions (original) ===
     // Fire + Sand -> Fire + Sand (sand cools fire slightly)
     (
         name: "Fire+Sand cooling",
@@ -44,7 +69,7 @@
         temp_delta: -50,
     ),
 
-    // === Inert reactions (no material change, included for completeness) ===
+    // === Inert reactions (original, no material change) ===
     // Fire + Stone -> unchanged
     (
         name: "Fire+Stone inert",
@@ -147,5 +172,1512 @@
         output_a: 5,
         output_b: 0,
         probability: 0.0,
+    ),
+
+    // =========================================================================
+    // === FIRE + ORGANIC MATERIALS ===
+    // Fire(5) burns organics to Ash(9), Smoke(6), or Charcoal(105).
+    // =========================================================================
+
+    // Pine burns fast, produces ash
+    (
+        name: "Fire+Pine combustion",
+        input_a: 5,
+        input_b: 90,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.8,
+        temp_delta: 180,
+    ),
+    // Oak is dense hardwood, slower burn, produces charcoal
+    (
+        name: "Fire+Oak combustion",
+        input_a: 5,
+        input_b: 91,
+        output_a: 5,
+        output_b: 105,
+        probability: 0.7,
+        temp_delta: 200,
+    ),
+    // Bamboo burns readily, hollow structure catches fast
+    (
+        name: "Fire+Bamboo combustion",
+        input_a: 5,
+        input_b: 92,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.85,
+        temp_delta: 150,
+    ),
+    // Cork is light and porous, burns easily
+    (
+        name: "Fire+Cork combustion",
+        input_a: 5,
+        input_b: 93,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.9,
+        temp_delta: 120,
+    ),
+    // Paper burns very fast
+    (
+        name: "Fire+Paper combustion",
+        input_a: 5,
+        input_b: 94,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.95,
+        temp_delta: 100,
+    ),
+    // Cloth catches fire readily
+    (
+        name: "Fire+Cloth combustion",
+        input_a: 5,
+        input_b: 95,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.85,
+        temp_delta: 120,
+    ),
+    // Rope is tightly wound fiber, burns well
+    (
+        name: "Fire+Rope combustion",
+        input_a: 5,
+        input_b: 96,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.8,
+        temp_delta: 130,
+    ),
+    // Leather burns with acrid smoke
+    (
+        name: "Fire+Leather combustion",
+        input_a: 5,
+        input_b: 97,
+        output_a: 5,
+        output_b: 6,
+        probability: 0.7,
+        temp_delta: 150,
+    ),
+    // Wax melts and burns, smoky
+    (
+        name: "Fire+Wax combustion",
+        input_a: 5,
+        input_b: 100,
+        output_a: 5,
+        output_b: 6,
+        probability: 0.9,
+        temp_delta: 80,
+    ),
+    // Fat renders and burns
+    (
+        name: "Fire+Fat combustion",
+        input_a: 5,
+        input_b: 101,
+        output_a: 5,
+        output_b: 6,
+        probability: 0.85,
+        temp_delta: 90,
+    ),
+    // Tallow is rendered fat, similar burn profile
+    (
+        name: "Fire+Tallow combustion",
+        input_a: 5,
+        input_b: 102,
+        output_a: 5,
+        output_b: 6,
+        probability: 0.85,
+        temp_delta: 85,
+    ),
+    // Resin is sticky and flammable, hot burn
+    (
+        name: "Fire+Resin combustion",
+        input_a: 5,
+        input_b: 103,
+        output_a: 5,
+        output_b: 6,
+        probability: 0.8,
+        temp_delta: 140,
+    ),
+    // Rubber produces thick toxic smoke when burning
+    (
+        name: "Fire+Rubber combustion",
+        input_a: 5,
+        input_b: 104,
+        output_a: 5,
+        output_b: 6,
+        probability: 0.7,
+        temp_delta: 160,
+    ),
+    // Charcoal burns slowly and very hot
+    (
+        name: "Fire+Charcoal combustion",
+        input_a: 5,
+        input_b: 105,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.5,
+        temp_delta: 250,
+    ),
+    // Coal burns even hotter, very slow to ignite
+    (
+        name: "Fire+Coal combustion",
+        input_a: 5,
+        input_b: 106,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.4,
+        temp_delta: 300,
+    ),
+    // Moss is light and dry, burns fast
+    (
+        name: "Fire+Moss combustion",
+        input_a: 5,
+        input_b: 107,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.9,
+        temp_delta: 80,
+    ),
+    // Algae is wet, burns reluctantly with smoke
+    (
+        name: "Fire+Algae combustion",
+        input_a: 5,
+        input_b: 108,
+        output_a: 5,
+        output_b: 6,
+        probability: 0.8,
+        temp_delta: 60,
+    ),
+    // Fungus burns with smoke, moderate reluctance
+    (
+        name: "Fire+Fungus combustion",
+        input_a: 5,
+        input_b: 109,
+        output_a: 5,
+        output_b: 6,
+        probability: 0.75,
+        temp_delta: 70,
+    ),
+    // Bark burns to charcoal, like oak
+    (
+        name: "Fire+Bark combustion",
+        input_a: 5,
+        input_b: 110,
+        output_a: 5,
+        output_b: 105,
+        probability: 0.7,
+        temp_delta: 180,
+    ),
+    // Sawdust is extremely flammable fine particles
+    (
+        name: "Fire+Sawdust combustion",
+        input_a: 5,
+        input_b: 111,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.95,
+        temp_delta: 150,
+    ),
+    // Grain burns readily
+    (
+        name: "Fire+Grain combustion",
+        input_a: 5,
+        input_b: 112,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.9,
+        temp_delta: 100,
+    ),
+    // Sugar caramelizes then burns to smoke
+    (
+        name: "Fire+Sugar combustion",
+        input_a: 5,
+        input_b: 113,
+        output_a: 5,
+        output_b: 6,
+        probability: 0.85,
+        temp_delta: 120,
+    ),
+    // Flour dust is explosive when aerosolized
+    (
+        name: "Fire+Flour combustion",
+        input_a: 5,
+        input_b: 114,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.95,
+        temp_delta: 180,
+    ),
+    // Starch burns similarly to flour
+    (
+        name: "Fire+Starch combustion",
+        input_a: 5,
+        input_b: 115,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.9,
+        temp_delta: 130,
+    ),
+    // Cotton is extremely flammable
+    (
+        name: "Fire+Cotton combustion",
+        input_a: 5,
+        input_b: 120,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.95,
+        temp_delta: 100,
+    ),
+    // Silk burns, slightly less eagerly than cotton
+    (
+        name: "Fire+Silk combustion",
+        input_a: 5,
+        input_b: 119,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.85,
+        temp_delta: 90,
+    ),
+    // Plant fiber catches fire easily
+    (
+        name: "Fire+PlantFiber combustion",
+        input_a: 5,
+        input_b: 118,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.9,
+        temp_delta: 110,
+    ),
+    // Parchment burns like paper
+    (
+        name: "Fire+Parchment combustion",
+        input_a: 5,
+        input_b: 128,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.9,
+        temp_delta: 100,
+    ),
+    // Alcohol is highly flammable, burns clean with smoke
+    (
+        name: "Fire+Alcohol combustion",
+        input_a: 5,
+        input_b: 123,
+        output_a: 5,
+        output_b: 6,
+        probability: 0.95,
+        temp_delta: 150,
+    ),
+    // Meat chars and smokes
+    (
+        name: "Fire+Meat combustion",
+        input_a: 5,
+        input_b: 126,
+        output_a: 5,
+        output_b: 6,
+        probability: 0.6,
+        temp_delta: 80,
+    ),
+    // Honey caramelizes and burns slowly
+    (
+        name: "Fire+Honey combustion",
+        input_a: 5,
+        input_b: 121,
+        output_a: 5,
+        output_b: 6,
+        probability: 0.5,
+        temp_delta: 60,
+    ),
+    // Dye burns with colored smoke
+    (
+        name: "Fire+Dye combustion",
+        input_a: 5,
+        input_b: 124,
+        output_a: 5,
+        output_b: 6,
+        probability: 0.7,
+        temp_delta: 80,
+    ),
+    // Ink burns with dark smoke
+    (
+        name: "Fire+Ink combustion",
+        input_a: 5,
+        input_b: 125,
+        output_a: 5,
+        output_b: 6,
+        probability: 0.7,
+        temp_delta: 70,
+    ),
+    // Compost smolders slowly
+    (
+        name: "Fire+Compost combustion",
+        input_a: 5,
+        input_b: 116,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.6,
+        temp_delta: 80,
+    ),
+    // Charcoal dust is extremely flammable fine powder
+    (
+        name: "Fire+CharcoalDust combustion",
+        input_a: 5,
+        input_b: 129,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.95,
+        temp_delta: 200,
+    ),
+
+    // =========================================================================
+    // === FIRE + FLAMMABLE GASES ===
+    // Gas ignition produces explosive chain reactions.
+    // =========================================================================
+
+    // Methane detonates into expanding fire
+    (
+        name: "Fire+Methane detonation",
+        input_a: 5,
+        input_b: 136,
+        output_a: 5,
+        output_b: 5,
+        probability: 1.0,
+        temp_delta: 300,
+    ),
+    // Propane burns hotter than methane
+    (
+        name: "Fire+Propane detonation",
+        input_a: 5,
+        input_b: 137,
+        output_a: 5,
+        output_b: 5,
+        probability: 1.0,
+        temp_delta: 350,
+    ),
+    // Natural gas ignites reliably
+    (
+        name: "Fire+NaturalGas detonation",
+        input_a: 5,
+        input_b: 138,
+        output_a: 5,
+        output_b: 5,
+        probability: 1.0,
+        temp_delta: 280,
+    ),
+    // Hydrogen burns with invisible flame, produces steam
+    (
+        name: "Fire+Hydrogen detonation",
+        input_a: 5,
+        input_b: 45,
+        output_a: 5,
+        output_b: 7,
+        probability: 1.0,
+        temp_delta: 400,
+    ),
+
+    // =========================================================================
+    // === FIRE + PLASTICS ===
+    // Plastics produce Toxic Gas(134) when burned.
+    // =========================================================================
+
+    // Generic plastic burns to toxic fumes
+    (
+        name: "Fire+Plastic combustion",
+        input_a: 5,
+        input_b: 178,
+        output_a: 5,
+        output_b: 134,
+        probability: 0.7,
+        temp_delta: 100,
+    ),
+    // Polyethylene melts and burns
+    (
+        name: "Fire+Polyethylene combustion",
+        input_a: 5,
+        input_b: 179,
+        output_a: 5,
+        output_b: 134,
+        probability: 0.75,
+        temp_delta: 110,
+    ),
+    // PVC releases chlorine gas when burned — very toxic
+    (
+        name: "Fire+PVC combustion",
+        input_a: 5,
+        input_b: 180,
+        output_a: 5,
+        output_b: 134,
+        probability: 0.8,
+        temp_delta: 120,
+    ),
+    // Nylon melts and drips while burning
+    (
+        name: "Fire+Nylon combustion",
+        input_a: 5,
+        input_b: 181,
+        output_a: 5,
+        output_b: 134,
+        probability: 0.7,
+        temp_delta: 100,
+    ),
+    // Foam burns rapidly, very flammable
+    (
+        name: "Fire+Foam combustion",
+        input_a: 5,
+        input_b: 184,
+        output_a: 5,
+        output_b: 134,
+        probability: 0.9,
+        temp_delta: 80,
+    ),
+    // Styrofoam is extremely flammable, melts and burns
+    (
+        name: "Fire+Styrofoam combustion",
+        input_a: 5,
+        input_b: 185,
+        output_a: 5,
+        output_b: 134,
+        probability: 0.95,
+        temp_delta: 90,
+    ),
+    // Plexiglass burns with moderate resistance
+    (
+        name: "Fire+Plexiglass combustion",
+        input_a: 5,
+        input_b: 206,
+        output_a: 5,
+        output_b: 134,
+        probability: 0.6,
+        temp_delta: 100,
+    ),
+    // Synthetic rubber burns like natural rubber but more toxic
+    (
+        name: "Fire+SyntheticRubber combustion",
+        input_a: 5,
+        input_b: 209,
+        output_a: 5,
+        output_b: 134,
+        probability: 0.7,
+        temp_delta: 120,
+    ),
+    // Paint contains solvents, produces toxic fumes
+    (
+        name: "Fire+Paint combustion",
+        input_a: 5,
+        input_b: 198,
+        output_a: 5,
+        output_b: 134,
+        probability: 0.8,
+        temp_delta: 80,
+    ),
+    // Varnish is flammable finish, burns to smoke
+    (
+        name: "Fire+Varnish combustion",
+        input_a: 5,
+        input_b: 199,
+        output_a: 5,
+        output_b: 6,
+        probability: 0.85,
+        temp_delta: 90,
+    ),
+    // Lacquer is highly flammable, burns to smoke
+    (
+        name: "Fire+Lacquer combustion",
+        input_a: 5,
+        input_b: 200,
+        output_a: 5,
+        output_b: 6,
+        probability: 0.85,
+        temp_delta: 85,
+    ),
+
+    // =========================================================================
+    // === FIRE + OTHER FLAMMABLES ===
+    // Miscellaneous combustible materials.
+    // =========================================================================
+
+    // Peat is dense organic soil, slow burn
+    (
+        name: "Fire+Peat combustion",
+        input_a: 5,
+        input_b: 25,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.6,
+        temp_delta: 150,
+    ),
+    // Tar burns with thick black smoke
+    (
+        name: "Fire+Tar combustion",
+        input_a: 5,
+        input_b: 36,
+        output_a: 5,
+        output_b: 6,
+        probability: 0.8,
+        temp_delta: 200,
+    ),
+    // Bitumen is similar to tar, heavy smoke
+    (
+        name: "Fire+Bitumen combustion",
+        input_a: 5,
+        input_b: 37,
+        output_a: 5,
+        output_b: 6,
+        probability: 0.75,
+        temp_delta: 180,
+    ),
+    // Sulfur burns with pungent smoke
+    (
+        name: "Fire+Sulfur combustion",
+        input_a: 5,
+        input_b: 39,
+        output_a: 5,
+        output_b: 6,
+        probability: 0.9,
+        temp_delta: 250,
+    ),
+    // Asphalt burns reluctantly, heavy smoke
+    (
+        name: "Fire+Asphalt combustion",
+        input_a: 5,
+        input_b: 189,
+        output_a: 5,
+        output_b: 6,
+        probability: 0.6,
+        temp_delta: 150,
+    ),
+    // Napalm + Fire = Inferno — extremely hot, persistent
+    (
+        name: "Fire+Napalm inferno",
+        input_a: 5,
+        input_b: 160,
+        output_a: 164,
+        output_b: 5,
+        probability: 1.0,
+        temp_delta: 400,
+    ),
+    // Coke burns very hot and very slowly
+    (
+        name: "Fire+Coke combustion",
+        input_a: 5,
+        input_b: 168,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.4,
+        temp_delta: 350,
+    ),
+
+    // =========================================================================
+    // === EMBER IGNITION ===
+    // Ember(132) can ignite flammable materials at lower probability than
+    // direct fire contact, simulating smoldering ignition.
+    // =========================================================================
+
+    // Ember smolders into wood, slow ignition
+    (
+        name: "Ember+Wood ignition",
+        input_a: 132,
+        input_b: 8,
+        output_a: 5,
+        output_b: 105,
+        probability: 0.3,
+        temp_delta: 100,
+    ),
+    // Ember catches paper easily
+    (
+        name: "Ember+Paper ignition",
+        input_a: 132,
+        input_b: 94,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.6,
+        temp_delta: 80,
+    ),
+    // Ember ignites sawdust readily
+    (
+        name: "Ember+Sawdust ignition",
+        input_a: 132,
+        input_b: 111,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.7,
+        temp_delta: 100,
+    ),
+    // Ember slowly ignites coal
+    (
+        name: "Ember+Coal ignition",
+        input_a: 132,
+        input_b: 106,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.2,
+        temp_delta: 150,
+    ),
+    // Ember ignites oil
+    (
+        name: "Ember+Oil ignition",
+        input_a: 132,
+        input_b: 4,
+        output_a: 5,
+        output_b: 6,
+        probability: 0.5,
+        temp_delta: 80,
+    ),
+    // Ember ignites alcohol fumes
+    (
+        name: "Ember+Alcohol ignition",
+        input_a: 132,
+        input_b: 123,
+        output_a: 5,
+        output_b: 6,
+        probability: 0.7,
+        temp_delta: 100,
+    ),
+    // Ember detonates methane
+    (
+        name: "Ember+Methane ignition",
+        input_a: 132,
+        input_b: 136,
+        output_a: 5,
+        output_b: 5,
+        probability: 0.8,
+        temp_delta: 200,
+    ),
+    // Ember detonates hydrogen
+    (
+        name: "Ember+Hydrogen ignition",
+        input_a: 132,
+        input_b: 45,
+        output_a: 5,
+        output_b: 7,
+        probability: 0.9,
+        temp_delta: 300,
+    ),
+
+    // =========================================================================
+    // === SPARK IGNITION ===
+    // Spark(131) is a brief electrical flash — lower ignition probability
+    // than ember but can still trigger combustion and gas detonation.
+    // =========================================================================
+
+    // Spark may catch wood on fire
+    (
+        name: "Spark+Wood ignition",
+        input_a: 131,
+        input_b: 8,
+        output_a: 5,
+        output_b: 105,
+        probability: 0.15,
+        temp_delta: 80,
+    ),
+    // Spark easily lights paper
+    (
+        name: "Spark+Paper ignition",
+        input_a: 131,
+        input_b: 94,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.4,
+        temp_delta: 60,
+    ),
+    // Spark ignites sawdust
+    (
+        name: "Spark+Sawdust ignition",
+        input_a: 131,
+        input_b: 111,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.5,
+        temp_delta: 80,
+    ),
+    // Spark detonates methane gas
+    (
+        name: "Spark+Methane ignition",
+        input_a: 131,
+        input_b: 136,
+        output_a: 5,
+        output_b: 5,
+        probability: 0.6,
+        temp_delta: 180,
+    ),
+    // Spark detonates hydrogen
+    (
+        name: "Spark+Hydrogen ignition",
+        input_a: 131,
+        input_b: 45,
+        output_a: 5,
+        output_b: 7,
+        probability: 0.7,
+        temp_delta: 250,
+    ),
+    // Spark ignites gunpowder — near-certain detonation
+    (
+        name: "Spark+Gunpowder detonation",
+        input_a: 131,
+        input_b: 12,
+        output_a: 5,
+        output_b: 5,
+        probability: 0.9,
+        temp_delta: 400,
+    ),
+    // Spark detonates natural gas
+    (
+        name: "Spark+NaturalGas ignition",
+        input_a: 131,
+        input_b: 138,
+        output_a: 5,
+        output_b: 5,
+        probability: 0.5,
+        temp_delta: 200,
+    ),
+
+    // =========================================================================
+    // === LAVA COMBUSTION ===
+    // Lava(11) instantly ignites combustibles on contact due to extreme heat.
+    // =========================================================================
+
+    // Lava incinerates paper instantly
+    (
+        name: "Lava+Paper combustion",
+        input_a: 11,
+        input_b: 94,
+        output_a: 11,
+        output_b: 9,
+        probability: 0.9,
+        temp_delta: 50,
+    ),
+    // Lava burns cloth
+    (
+        name: "Lava+Cloth combustion",
+        input_a: 11,
+        input_b: 95,
+        output_a: 11,
+        output_b: 9,
+        probability: 0.85,
+        temp_delta: 50,
+    ),
+    // Lava burns sawdust instantly
+    (
+        name: "Lava+Sawdust combustion",
+        input_a: 11,
+        input_b: 111,
+        output_a: 11,
+        output_b: 9,
+        probability: 0.95,
+        temp_delta: 80,
+    ),
+    // Lava burns cotton
+    (
+        name: "Lava+Cotton combustion",
+        input_a: 11,
+        input_b: 120,
+        output_a: 11,
+        output_b: 9,
+        probability: 0.9,
+        temp_delta: 50,
+    ),
+    // Lava slowly consumes coal
+    (
+        name: "Lava+Coal combustion",
+        input_a: 11,
+        input_b: 106,
+        output_a: 11,
+        output_b: 9,
+        probability: 0.5,
+        temp_delta: 100,
+    ),
+    // Lava ignites alcohol into open flame
+    (
+        name: "Lava+Alcohol combustion",
+        input_a: 11,
+        input_b: 123,
+        output_a: 11,
+        output_b: 5,
+        probability: 0.95,
+        temp_delta: 100,
+    ),
+
+    // =========================================================================
+    // === REACTIVE METALS + WATER ===
+    // Alkali metals react violently with water, producing fire and steam.
+    // =========================================================================
+
+    // Sodium reacts violently with water — fire and steam
+    (
+        name: "Sodium+Water reaction",
+        input_a: 64,
+        input_b: 3,
+        output_a: 5,
+        output_b: 7,
+        probability: 1.0,
+        temp_delta: 400,
+    ),
+    // Potassium reacts even more violently than sodium
+    (
+        name: "Potassium+Water reaction",
+        input_a: 65,
+        input_b: 3,
+        output_a: 5,
+        output_b: 7,
+        probability: 1.0,
+        temp_delta: 500,
+    ),
+    // Metal filings thrown into fire produce sparks
+    (
+        name: "Filings+Fire sparks",
+        input_a: 86,
+        input_b: 5,
+        output_a: 131,
+        output_b: 9,
+        probability: 0.7,
+        temp_delta: 100,
+    ),
+
+    // =========================================================================
+    // === SPECIAL FLAMES ===
+    // Greek Fire, Napalm, and Wildfire have unusual combustion behavior.
+    // =========================================================================
+
+    // Greek Fire cannot be extinguished by water — burns on water surface
+    (
+        name: "GreekFire+Water persist",
+        input_a: 161,
+        input_b: 3,
+        output_a: 161,
+        output_b: 7,
+        probability: 0.8,
+        temp_delta: 50,
+    ),
+    // Napalm resists water, generates steam instead of extinguishing
+    (
+        name: "Napalm+Water persist",
+        input_a: 160,
+        input_b: 3,
+        output_a: 160,
+        output_b: 7,
+        probability: 0.7,
+        temp_delta: 30,
+    ),
+    // Wildfire rapidly consumes wood
+    (
+        name: "Wildfire+Wood combustion",
+        input_a: 165,
+        input_b: 8,
+        output_a: 165,
+        output_b: 9,
+        probability: 0.95,
+        temp_delta: 250,
+    ),
+
+    // =========================================================================
+    // === FIRE + REMAINING ORGANICS ===
+    // Additional organic materials that interact with fire.
+    // =========================================================================
+
+    // Bone burns very reluctantly, produces smoke
+    (
+        name: "Fire+Bone combustion",
+        input_a: 5,
+        input_b: 98,
+        output_a: 5,
+        output_b: 6,
+        probability: 0.3,
+        temp_delta: 50,
+    ),
+    // Shell barely burns, mostly inert with slight cooling
+    (
+        name: "Fire+Shell inert",
+        input_a: 5,
+        input_b: 99,
+        output_a: 5,
+        output_b: 99,
+        probability: 0.1,
+        temp_delta: -10,
+    ),
+    // Humus smolders like compost
+    (
+        name: "Fire+Humus combustion",
+        input_a: 5,
+        input_b: 117,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.5,
+        temp_delta: 70,
+    ),
+    // Vinegar is mostly water, resists burning
+    (
+        name: "Fire+Vinegar cooling",
+        input_a: 5,
+        input_b: 122,
+        output_a: 5,
+        output_b: 7,
+        probability: 0.4,
+        temp_delta: -20,
+    ),
+    // Soap burns poorly
+    (
+        name: "Fire+Soap combustion",
+        input_a: 5,
+        input_b: 127,
+        output_a: 5,
+        output_b: 6,
+        probability: 0.4,
+        temp_delta: 40,
+    ),
+    // Soot is fine carbon, burns readily
+    (
+        name: "Fire+Soot combustion",
+        input_a: 5,
+        input_b: 167,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.7,
+        temp_delta: 100,
+    ),
+
+    // =========================================================================
+    // === FIRE + GUNPOWDER AND ENCHANTED ===
+    // Explosive and magical material interactions.
+    // =========================================================================
+
+    // Gunpowder detonates on fire contact
+    (
+        name: "Fire+Gunpowder detonation",
+        input_a: 5,
+        input_b: 12,
+        output_a: 5,
+        output_b: 5,
+        probability: 1.0,
+        temp_delta: 500,
+    ),
+    // Enchanted Wood resists fire, glows but does not burn
+    (
+        name: "Fire+EnchantedWood resist",
+        input_a: 5,
+        input_b: 233,
+        output_a: 5,
+        output_b: 233,
+        probability: 0.1,
+        temp_delta: -30,
+    ),
+
+    // =========================================================================
+    // === EMBER + ADDITIONAL MATERIALS ===
+    // Ember smoldering ignition for more materials.
+    // =========================================================================
+
+    // Ember ignites pine
+    (
+        name: "Ember+Pine ignition",
+        input_a: 132,
+        input_b: 90,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.4,
+        temp_delta: 90,
+    ),
+    // Ember ignites cloth
+    (
+        name: "Ember+Cloth ignition",
+        input_a: 132,
+        input_b: 95,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.5,
+        temp_delta: 80,
+    ),
+    // Ember ignites cotton
+    (
+        name: "Ember+Cotton ignition",
+        input_a: 132,
+        input_b: 120,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.6,
+        temp_delta: 70,
+    ),
+    // Ember ignites charcoal dust
+    (
+        name: "Ember+CharcoalDust ignition",
+        input_a: 132,
+        input_b: 129,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.8,
+        temp_delta: 120,
+    ),
+    // Ember ignites straw/grain
+    (
+        name: "Ember+Grain ignition",
+        input_a: 132,
+        input_b: 112,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.5,
+        temp_delta: 80,
+    ),
+    // Ember ignites parchment
+    (
+        name: "Ember+Parchment ignition",
+        input_a: 132,
+        input_b: 128,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.55,
+        temp_delta: 70,
+    ),
+    // Ember ignites bark
+    (
+        name: "Ember+Bark ignition",
+        input_a: 132,
+        input_b: 110,
+        output_a: 5,
+        output_b: 105,
+        probability: 0.35,
+        temp_delta: 90,
+    ),
+    // Ember ignites resin
+    (
+        name: "Ember+Resin ignition",
+        input_a: 132,
+        input_b: 103,
+        output_a: 5,
+        output_b: 6,
+        probability: 0.45,
+        temp_delta: 80,
+    ),
+    // Ember ignites gunpowder
+    (
+        name: "Ember+Gunpowder ignition",
+        input_a: 132,
+        input_b: 12,
+        output_a: 5,
+        output_b: 5,
+        probability: 0.85,
+        temp_delta: 350,
+    ),
+    // Ember ignites wax
+    (
+        name: "Ember+Wax ignition",
+        input_a: 132,
+        input_b: 100,
+        output_a: 5,
+        output_b: 6,
+        probability: 0.6,
+        temp_delta: 50,
+    ),
+    // Ember ignites propane
+    (
+        name: "Ember+Propane ignition",
+        input_a: 132,
+        input_b: 137,
+        output_a: 5,
+        output_b: 5,
+        probability: 0.85,
+        temp_delta: 250,
+    ),
+    // Ember ignites natural gas
+    (
+        name: "Ember+NaturalGas ignition",
+        input_a: 132,
+        input_b: 138,
+        output_a: 5,
+        output_b: 5,
+        probability: 0.75,
+        temp_delta: 200,
+    ),
+
+    // =========================================================================
+    // === SPARK + ADDITIONAL MATERIALS ===
+    // Spark ignition for more materials.
+    // =========================================================================
+
+    // Spark may light cloth
+    (
+        name: "Spark+Cloth ignition",
+        input_a: 131,
+        input_b: 95,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.3,
+        temp_delta: 60,
+    ),
+    // Spark may light cotton
+    (
+        name: "Spark+Cotton ignition",
+        input_a: 131,
+        input_b: 120,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.4,
+        temp_delta: 50,
+    ),
+    // Spark ignites oil
+    (
+        name: "Spark+Oil ignition",
+        input_a: 131,
+        input_b: 4,
+        output_a: 5,
+        output_b: 6,
+        probability: 0.35,
+        temp_delta: 70,
+    ),
+    // Spark ignites alcohol
+    (
+        name: "Spark+Alcohol ignition",
+        input_a: 131,
+        input_b: 123,
+        output_a: 5,
+        output_b: 6,
+        probability: 0.5,
+        temp_delta: 80,
+    ),
+    // Spark ignites propane
+    (
+        name: "Spark+Propane ignition",
+        input_a: 131,
+        input_b: 137,
+        output_a: 5,
+        output_b: 5,
+        probability: 0.55,
+        temp_delta: 200,
+    ),
+    // Spark ignites charcoal dust
+    (
+        name: "Spark+CharcoalDust ignition",
+        input_a: 131,
+        input_b: 129,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.6,
+        temp_delta: 100,
+    ),
+
+    // =========================================================================
+    // === LAVA + ADDITIONAL MATERIALS ===
+    // Lava instantly combusts more materials.
+    // =========================================================================
+
+    // Lava burns wood to ash
+    (
+        name: "Lava+Wood combustion",
+        input_a: 11,
+        input_b: 8,
+        output_a: 11,
+        output_b: 9,
+        probability: 0.9,
+        temp_delta: 80,
+    ),
+    // Lava burns pine
+    (
+        name: "Lava+Pine combustion",
+        input_a: 11,
+        input_b: 90,
+        output_a: 11,
+        output_b: 9,
+        probability: 0.85,
+        temp_delta: 60,
+    ),
+    // Lava burns oak to charcoal
+    (
+        name: "Lava+Oak combustion",
+        input_a: 11,
+        input_b: 91,
+        output_a: 11,
+        output_b: 105,
+        probability: 0.8,
+        temp_delta: 70,
+    ),
+    // Lava burns rope
+    (
+        name: "Lava+Rope combustion",
+        input_a: 11,
+        input_b: 96,
+        output_a: 11,
+        output_b: 9,
+        probability: 0.85,
+        temp_delta: 50,
+    ),
+    // Lava melts and burns plastic — toxic fumes
+    (
+        name: "Lava+Plastic combustion",
+        input_a: 11,
+        input_b: 178,
+        output_a: 11,
+        output_b: 134,
+        probability: 0.8,
+        temp_delta: 40,
+    ),
+    // Lava ignites oil into fire
+    (
+        name: "Lava+Oil combustion",
+        input_a: 11,
+        input_b: 4,
+        output_a: 11,
+        output_b: 5,
+        probability: 0.95,
+        temp_delta: 80,
+    ),
+    // Lava detonates gunpowder
+    (
+        name: "Lava+Gunpowder detonation",
+        input_a: 11,
+        input_b: 12,
+        output_a: 11,
+        output_b: 5,
+        probability: 1.0,
+        temp_delta: 300,
+    ),
+
+    // =========================================================================
+    // === WILDFIRE + ADDITIONAL MATERIALS ===
+    // Wildfire(165) spreads aggressively through flammables.
+    // =========================================================================
+
+    // Wildfire burns pine
+    (
+        name: "Wildfire+Pine combustion",
+        input_a: 165,
+        input_b: 90,
+        output_a: 165,
+        output_b: 9,
+        probability: 0.95,
+        temp_delta: 200,
+    ),
+    // Wildfire burns oak
+    (
+        name: "Wildfire+Oak combustion",
+        input_a: 165,
+        input_b: 91,
+        output_a: 165,
+        output_b: 105,
+        probability: 0.9,
+        temp_delta: 220,
+    ),
+    // Wildfire burns bark
+    (
+        name: "Wildfire+Bark combustion",
+        input_a: 165,
+        input_b: 110,
+        output_a: 165,
+        output_b: 105,
+        probability: 0.9,
+        temp_delta: 200,
+    ),
+    // Wildfire burns sawdust
+    (
+        name: "Wildfire+Sawdust combustion",
+        input_a: 165,
+        input_b: 111,
+        output_a: 165,
+        output_b: 9,
+        probability: 1.0,
+        temp_delta: 180,
+    ),
+    // Wildfire burns cloth
+    (
+        name: "Wildfire+Cloth combustion",
+        input_a: 165,
+        input_b: 95,
+        output_a: 165,
+        output_b: 9,
+        probability: 0.95,
+        temp_delta: 150,
+    ),
+    // Wildfire burns bamboo
+    (
+        name: "Wildfire+Bamboo combustion",
+        input_a: 165,
+        input_b: 92,
+        output_a: 165,
+        output_b: 9,
+        probability: 0.95,
+        temp_delta: 180,
+    ),
+
+    // =========================================================================
+    // === INFERNO INTERACTIONS ===
+    // Inferno(164) is sustained intense fire, harder to extinguish.
+    // =========================================================================
+
+    // Inferno partially resists water — produces steam but persists
+    (
+        name: "Inferno+Water partial",
+        input_a: 164,
+        input_b: 3,
+        output_a: 5,
+        output_b: 7,
+        probability: 0.6,
+        temp_delta: -100,
+    ),
+    // Inferno burns wood instantly
+    (
+        name: "Inferno+Wood combustion",
+        input_a: 164,
+        input_b: 8,
+        output_a: 164,
+        output_b: 9,
+        probability: 1.0,
+        temp_delta: 300,
+    ),
+    // Inferno burns coal
+    (
+        name: "Inferno+Coal combustion",
+        input_a: 164,
+        input_b: 106,
+        output_a: 164,
+        output_b: 9,
+        probability: 0.7,
+        temp_delta: 350,
+    ),
+
+    // =========================================================================
+    // === GREEK FIRE ADDITIONAL INTERACTIONS ===
+    // Greek Fire(161) burns on almost anything, extremely hard to extinguish.
+    // =========================================================================
+
+    // Greek Fire burns wood
+    (
+        name: "GreekFire+Wood combustion",
+        input_a: 161,
+        input_b: 8,
+        output_a: 161,
+        output_b: 9,
+        probability: 0.95,
+        temp_delta: 200,
+    ),
+    // Greek Fire burns on sand but does not consume it
+    (
+        name: "GreekFire+Sand persist",
+        input_a: 161,
+        input_b: 2,
+        output_a: 161,
+        output_b: 2,
+        probability: 0.3,
+        temp_delta: -20,
+    ),
+    // Greek Fire on stone — persists, slight cooling
+    (
+        name: "GreekFire+Stone persist",
+        input_a: 161,
+        input_b: 1,
+        output_a: 161,
+        output_b: 1,
+        probability: 0.2,
+        temp_delta: -15,
+    ),
+
+    // =========================================================================
+    // === NAPALM ADDITIONAL INTERACTIONS ===
+    // Napalm(160) sticks and burns; resists extinguishing.
+    // =========================================================================
+
+    // Napalm burns wood
+    (
+        name: "Napalm+Wood combustion",
+        input_a: 160,
+        input_b: 8,
+        output_a: 160,
+        output_b: 9,
+        probability: 0.9,
+        temp_delta: 250,
+    ),
+    // Napalm on sand — sticks and cools slightly
+    (
+        name: "Napalm+Sand cooling",
+        input_a: 160,
+        input_b: 2,
+        output_a: 160,
+        output_b: 2,
+        probability: 0.4,
+        temp_delta: -30,
+    ),
+
+    // =========================================================================
+    // === CROSS-MATERIAL INERT / COOLING REACTIONS ===
+    // Non-combustion interactions included for completeness.
+    // =========================================================================
+
+    // Smoke + Water -> Smoke dissolves
+    (
+        name: "Smoke+Water dissolve",
+        input_a: 6,
+        input_b: 3,
+        output_a: 0,
+        output_b: 3,
+        probability: 0.6,
+    ),
+    // Steam + Water -> condenses back
+    (
+        name: "Steam+Water condense",
+        input_a: 7,
+        input_b: 3,
+        output_a: 3,
+        output_b: 3,
+        probability: 0.3,
+    ),
+    // Ash + Water -> unchanged (wet ash)
+    (
+        name: "Ash+Water inert",
+        input_a: 9,
+        input_b: 3,
+        output_a: 9,
+        output_b: 3,
+        probability: 0.0,
+    ),
+    // Toxic Gas + Water -> Water scrubs toxic gas
+    (
+        name: "ToxicGas+Water scrub",
+        input_a: 134,
+        input_b: 3,
+        output_a: 0,
+        output_b: 3,
+        probability: 0.5,
+    ),
+    // Ember + Water -> Ash + Steam (water quenches ember)
+    (
+        name: "Ember+Water quench",
+        input_a: 132,
+        input_b: 3,
+        output_a: 9,
+        output_b: 7,
+        probability: 0.9,
+    ),
+    // Cinder + Water -> Ash + Steam
+    (
+        name: "Cinder+Water quench",
+        input_a: 133,
+        input_b: 3,
+        output_a: 9,
+        output_b: 7,
+        probability: 0.95,
+    ),
+    // Spark + Water -> Air + Steam
+    (
+        name: "Spark+Water extinguish",
+        input_a: 131,
+        input_b: 3,
+        output_a: 0,
+        output_b: 7,
+        probability: 1.0,
+    ),
+    // Inferno + Sand -> Fire + Sand (sand degrades inferno to regular fire)
+    (
+        name: "Inferno+Sand degrade",
+        input_a: 164,
+        input_b: 2,
+        output_a: 5,
+        output_b: 2,
+        probability: 0.4,
+    ),
+    // Wildfire + Water -> Fire + Steam (water weakens wildfire to regular fire)
+    (
+        name: "Wildfire+Water weaken",
+        input_a: 165,
+        input_b: 3,
+        output_a: 5,
+        output_b: 7,
+        probability: 0.7,
     ),
 ]
