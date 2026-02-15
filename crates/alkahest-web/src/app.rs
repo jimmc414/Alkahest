@@ -46,28 +46,10 @@ pub enum SaveStatus {
     Error(String),
 }
 
-/// Material names for debug display, indexed by material ID.
-const MATERIAL_NAMES: &[&str] = &[
-    "Air",
-    "Stone",
-    "Sand",
-    "Water",
-    "Oil",
-    "Fire",
-    "Smoke",
-    "Steam",
-    "Wood",
-    "Ash",
-    "Ice",
-    "Lava",
-    "Gunpowder",
-    "Sealed-Metal",
-    "Glass",
-    "Glass Shards",
-];
-
 /// Main application struct. Owns all subsystems.
 pub struct Application {
+    /// Material names for debug display, indexed by material ID.
+    material_names: Vec<String>,
     gpu: GpuContext,
     renderer: Renderer,
     sim: SimPipeline,
@@ -128,7 +110,17 @@ impl Application {
             Renderer::new(&gpu.device, &gpu.queue, gpu.surface_format, width, height);
 
         // Load and compile rule engine data (M3)
-        let rule_data = Self::load_rules(&gpu.device);
+        let (rule_data, material_table) = Self::load_rules(&gpu.device);
+
+        // Build material names indexed by ID for UI display
+        let max_id = material_table.max_id() as usize;
+        let mut material_names = vec!["?".to_string(); max_id + 1];
+        for mat in &material_table.materials {
+            let idx = mat.id as usize;
+            if idx < material_names.len() {
+                material_names[idx] = mat.name.clone();
+            }
+        }
 
         // Update renderer material colors from compiled data
         let material_colors: Vec<MaterialColor> = rule_data
@@ -213,7 +205,8 @@ impl Application {
             tick_accumulator: 0.0,
             pick_result: alkahest_render::PickResult::default(),
             frame_delta_ms: 16.67,
-            browser_state: crate::ui::browser::BrowserState::new(),
+            material_names,
+            browser_state: crate::ui::browser::BrowserState::new(&material_table),
             help_open: false,
             save_state: SaveState::Idle,
             save_status: SaveStatus::None,
@@ -249,25 +242,55 @@ impl Application {
     }
 
     /// Load, validate, and compile rule engine data from embedded RON files.
-    fn load_rules(device: &wgpu::Device) -> alkahest_rules::GpuRuleData {
+    /// Returns both the compiled GPU data and the parsed MaterialTable (for UI).
+    fn load_rules(
+        device: &wgpu::Device,
+    ) -> (
+        alkahest_rules::GpuRuleData,
+        alkahest_core::material::MaterialTable,
+    ) {
         // Embed RON data at compile time (avoids async fetch for M3)
+        // Material files
         let naturals_ron = include_str!("../../../data/materials/naturals.ron");
         let organics_ron = include_str!("../../../data/materials/organics.ron");
         let energy_ron = include_str!("../../../data/materials/energy.ron");
         let explosives_ron = include_str!("../../../data/materials/explosives.ron");
+        let metals_ron = include_str!("../../../data/materials/metals.ron");
+        let synthetics_ron = include_str!("../../../data/materials/synthetics.ron");
+        let exotic_ron = include_str!("../../../data/materials/exotic.ron");
+
+        // Rule files
         let combustion_ron = include_str!("../../../data/rules/combustion.ron");
         let structural_ron = include_str!("../../../data/rules/structural.ron");
+        let phase_change_ron = include_str!("../../../data/rules/phase_change.ron");
+        let dissolution_ron = include_str!("../../../data/rules/dissolution.ron");
+        let displacement_ron = include_str!("../../../data/rules/displacement.ron");
+        let biological_ron = include_str!("../../../data/rules/biological.ron");
+        let thermal_ron = include_str!("../../../data/rules/thermal.ron");
+        let synthesis_ron = include_str!("../../../data/rules/synthesis.ron");
 
         let materials = alkahest_rules::loader::load_all_materials(&[
             naturals_ron,
             organics_ron,
             energy_ron,
             explosives_ron,
+            metals_ron,
+            synthetics_ron,
+            exotic_ron,
         ])
         .expect("failed to parse material RON data");
 
-        let rules = alkahest_rules::loader::load_all_rules(&[combustion_ron, structural_ron])
-            .expect("failed to parse rules RON data");
+        let rules = alkahest_rules::loader::load_all_rules(&[
+            combustion_ron,
+            structural_ron,
+            phase_change_ron,
+            dissolution_ron,
+            displacement_ron,
+            biological_ron,
+            thermal_ron,
+            synthesis_ron,
+        ])
+        .expect("failed to parse rules RON data");
 
         // Validate
         if let Err(errors) = alkahest_rules::validator::validate_materials(&materials) {
@@ -289,7 +312,8 @@ impl Application {
             rules.len()
         );
 
-        alkahest_rules::compiler::compile(device, &materials, &rules)
+        let gpu_data = alkahest_rules::compiler::compile(device, &materials, &rules);
+        (gpu_data, materials)
     }
 
     /// Start the requestAnimationFrame loop.
@@ -821,6 +845,7 @@ impl Application {
             tick_accumulator,
             pick_result,
             frame_delta_ms,
+            material_names,
             browser_state,
             help_open,
             save_state,
@@ -872,7 +897,10 @@ impl Application {
                     tool_state.place_material = key;
                     log::info!(
                         "Selected material: {} ({})",
-                        MATERIAL_NAMES.get(key as usize).unwrap_or(&"Unknown"),
+                        material_names
+                            .get(key as usize)
+                            .map(|s| s.as_str())
+                            .unwrap_or("Unknown"),
                         key
                     );
                 }
@@ -895,7 +923,10 @@ impl Application {
                     tool_state.place_material = mat_id;
                     log::info!(
                         "Selected material: {} ({})",
-                        MATERIAL_NAMES.get(mat_id as usize).unwrap_or(&"Unknown"),
+                        material_names
+                            .get(mat_id as usize)
+                            .map(|s| s.as_str())
+                            .unwrap_or("Unknown"),
                         mat_id
                     );
                 }
@@ -1229,8 +1260,8 @@ impl Application {
             {
                 tool_state.place_material = mat_id;
             }
-            crate::ui::hud::show(ctx, tool_state, MATERIAL_NAMES, *sim_speed, sim.is_paused());
-            crate::ui::hover::show(ctx, pick_result, MATERIAL_NAMES);
+            crate::ui::hud::show(ctx, tool_state, material_names, *sim_speed, sim.is_paused());
+            crate::ui::hover::show(ctx, pick_result, material_names);
             let save_idle = matches!(save_state, SaveState::Idle);
             crate::ui::settings::show(
                 ctx,

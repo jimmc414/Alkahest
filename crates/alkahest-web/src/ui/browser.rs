@@ -1,3 +1,5 @@
+use alkahest_core::material::MaterialTable;
+
 /// Material phase category for browsing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Phase {
@@ -8,114 +10,55 @@ enum Phase {
     Gas,
 }
 
-/// Material entry for the browser.
+/// Material entry for the browser (owned strings, built from MaterialTable).
 struct MatEntry {
     id: u32,
-    name: &'static str,
+    name: String,
     phase: Phase,
 }
-
-const MATERIALS: &[MatEntry] = &[
-    MatEntry {
-        id: 0,
-        name: "Air",
-        phase: Phase::Gas,
-    },
-    MatEntry {
-        id: 1,
-        name: "Stone",
-        phase: Phase::Solid,
-    },
-    MatEntry {
-        id: 2,
-        name: "Sand",
-        phase: Phase::Powder,
-    },
-    MatEntry {
-        id: 3,
-        name: "Water",
-        phase: Phase::Liquid,
-    },
-    MatEntry {
-        id: 4,
-        name: "Oil",
-        phase: Phase::Liquid,
-    },
-    MatEntry {
-        id: 5,
-        name: "Fire",
-        phase: Phase::Gas,
-    },
-    MatEntry {
-        id: 6,
-        name: "Smoke",
-        phase: Phase::Gas,
-    },
-    MatEntry {
-        id: 7,
-        name: "Steam",
-        phase: Phase::Gas,
-    },
-    MatEntry {
-        id: 8,
-        name: "Wood",
-        phase: Phase::Solid,
-    },
-    MatEntry {
-        id: 9,
-        name: "Ash",
-        phase: Phase::Powder,
-    },
-    MatEntry {
-        id: 10,
-        name: "Ice",
-        phase: Phase::Solid,
-    },
-    MatEntry {
-        id: 11,
-        name: "Lava",
-        phase: Phase::Liquid,
-    },
-    MatEntry {
-        id: 12,
-        name: "Gunpowder",
-        phase: Phase::Powder,
-    },
-    MatEntry {
-        id: 13,
-        name: "Sealed-Metal",
-        phase: Phase::Solid,
-    },
-    MatEntry {
-        id: 14,
-        name: "Glass",
-        phase: Phase::Solid,
-    },
-    MatEntry {
-        id: 15,
-        name: "Glass Shards",
-        phase: Phase::Powder,
-    },
-];
 
 /// Material browser panel state.
 pub struct BrowserState {
     search: String,
     phase_filter: Phase,
-}
-
-impl Default for BrowserState {
-    fn default() -> Self {
-        Self {
-            search: String::new(),
-            phase_filter: Phase::All,
-        }
-    }
+    materials: Vec<MatEntry>,
 }
 
 impl BrowserState {
-    pub fn new() -> Self {
-        Self::default()
+    /// Build browser state from loaded MaterialTable.
+    pub fn new(table: &MaterialTable) -> Self {
+        let mut materials: Vec<MatEntry> = table
+            .materials
+            .iter()
+            .map(|m| MatEntry {
+                id: m.id as u32,
+                name: m.name.clone(),
+                phase: match m.phase {
+                    alkahest_core::material::Phase::Gas => Phase::Gas,
+                    alkahest_core::material::Phase::Liquid => Phase::Liquid,
+                    alkahest_core::material::Phase::Solid => Phase::Solid,
+                    alkahest_core::material::Phase::Powder => Phase::Powder,
+                },
+            })
+            .collect();
+        materials.sort_by_key(|m| m.id);
+        Self {
+            search: String::new(),
+            phase_filter: Phase::All,
+            materials,
+        }
+    }
+
+    /// Filter materials by search text. Returns matching (id, name) pairs.
+    pub fn filter_materials(&self, search: &str) -> Vec<(u32, &str)> {
+        let search_lower = search.to_lowercase();
+        self.materials
+            .iter()
+            .filter(|mat| {
+                search_lower.is_empty() || mat.name.to_lowercase().contains(&search_lower)
+            })
+            .map(|mat| (mat.id, mat.name.as_str()))
+            .collect()
     }
 }
 
@@ -146,9 +89,9 @@ pub fn show(ctx: &egui::Context, state: &mut BrowserState, current_material: u32
 
             let search_lower = state.search.to_lowercase();
             egui::ScrollArea::vertical()
-                .max_height(200.0)
+                .max_height(300.0)
                 .show(ui, |ui| {
-                    for mat in MATERIALS {
+                    for mat in &state.materials {
                         // Filter by phase
                         if state.phase_filter != Phase::All && mat.phase != state.phase_filter {
                             continue;
@@ -171,54 +114,128 @@ pub fn show(ctx: &egui::Context, state: &mut BrowserState, current_material: u32
     selected
 }
 
-/// CPU-only: filter materials by search text. Returns matching (id, name) pairs.
-/// Used by tests and potential future autocomplete.
-pub fn filter_materials(search: &str) -> Vec<(u32, &'static str)> {
-    let search_lower = search.to_lowercase();
-    MATERIALS
-        .iter()
-        .filter(|mat| search_lower.is_empty() || mat.name.to_lowercase().contains(&search_lower))
-        .map(|mat| (mat.id, mat.name))
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alkahest_core::material::{MaterialDef, MaterialTable, Phase as MatPhase};
+
+    fn test_table() -> MaterialTable {
+        MaterialTable {
+            materials: vec![
+                MaterialDef {
+                    id: 0,
+                    name: "Air".into(),
+                    phase: MatPhase::Gas,
+                    density: 0.0,
+                    color: (0.0, 0.0, 0.0),
+                    emission: 0.0,
+                    flammability: 0.0,
+                    ignition_temp: 0.0,
+                    decay_rate: 0,
+                    decay_threshold: 0,
+                    decay_product: 0,
+                    viscosity: 0.0,
+                    thermal_conductivity: 0.0,
+                    phase_change_temp: 0.0,
+                    phase_change_product: 0,
+                    structural_integrity: 0.0,
+                },
+                MaterialDef {
+                    id: 1,
+                    name: "Stone".into(),
+                    phase: MatPhase::Solid,
+                    density: 5000.0,
+                    color: (0.5, 0.5, 0.55),
+                    emission: 0.0,
+                    flammability: 0.0,
+                    ignition_temp: 0.0,
+                    decay_rate: 0,
+                    decay_threshold: 0,
+                    decay_product: 0,
+                    viscosity: 0.0,
+                    thermal_conductivity: 0.5,
+                    phase_change_temp: 0.0,
+                    phase_change_product: 0,
+                    structural_integrity: 50.0,
+                },
+                MaterialDef {
+                    id: 2,
+                    name: "Sand".into(),
+                    phase: MatPhase::Powder,
+                    density: 2500.0,
+                    color: (0.76, 0.70, 0.50),
+                    emission: 0.0,
+                    flammability: 0.0,
+                    ignition_temp: 0.0,
+                    decay_rate: 0,
+                    decay_threshold: 0,
+                    decay_product: 0,
+                    viscosity: 0.0,
+                    thermal_conductivity: 0.3,
+                    phase_change_temp: 0.0,
+                    phase_change_product: 0,
+                    structural_integrity: 0.0,
+                },
+                MaterialDef {
+                    id: 3,
+                    name: "Water".into(),
+                    phase: MatPhase::Liquid,
+                    density: 1000.0,
+                    color: (0.2, 0.4, 0.8),
+                    emission: 0.1,
+                    flammability: 0.0,
+                    ignition_temp: 0.0,
+                    decay_rate: 0,
+                    decay_threshold: 0,
+                    decay_product: 0,
+                    viscosity: 0.1,
+                    thermal_conductivity: 0.6,
+                    phase_change_temp: 373.0,
+                    phase_change_product: 7,
+                    structural_integrity: 0.0,
+                },
+            ],
+        }
+    }
 
     #[test]
-    fn test_material_browser_search_water() {
-        let results = filter_materials("wat");
+    fn test_browser_search_water() {
+        let state = BrowserState::new(&test_table());
+        let results = state.filter_materials("wat");
         let names: Vec<&str> = results.iter().map(|(_, n)| *n).collect();
         assert!(names.contains(&"Water"), "Should find Water for 'wat'");
         assert!(!names.contains(&"Stone"), "Should not find Stone for 'wat'");
     }
 
     #[test]
-    fn test_material_browser_search_empty() {
-        let results = filter_materials("");
-        assert_eq!(results.len(), MATERIALS.len(), "Empty search returns all");
+    fn test_browser_search_empty() {
+        let state = BrowserState::new(&test_table());
+        let results = state.filter_materials("");
+        assert_eq!(results.len(), 4, "Empty search returns all");
     }
 
     #[test]
-    fn test_material_browser_search_case_insensitive() {
-        let results = filter_materials("SAND");
+    fn test_browser_search_case_insensitive() {
+        let state = BrowserState::new(&test_table());
+        let results = state.filter_materials("SAND");
         let names: Vec<&str> = results.iter().map(|(_, n)| *n).collect();
         assert!(names.contains(&"Sand"));
     }
 
     #[test]
-    fn test_material_browser_search_no_results() {
-        let results = filter_materials("zzzzz");
+    fn test_browser_search_no_results() {
+        let state = BrowserState::new(&test_table());
+        let results = state.filter_materials("zzzzz");
         assert!(results.is_empty(), "No materials match 'zzzzz'");
     }
 
     #[test]
-    fn test_material_browser_search_glass() {
-        let results = filter_materials("glass");
-        let names: Vec<&str> = results.iter().map(|(_, n)| *n).collect();
-        assert!(names.contains(&"Glass"));
-        assert!(names.contains(&"Glass Shards"));
-        assert_eq!(names.len(), 2, "Only Glass and Glass Shards match");
+    fn test_browser_sorted_by_id() {
+        let mut table = test_table();
+        // Add in reverse order
+        table.materials.reverse();
+        let state = BrowserState::new(&table);
+        let ids: Vec<u32> = state.materials.iter().map(|m| m.id).collect();
+        assert_eq!(ids, vec![0, 1, 2, 3], "Materials should be sorted by ID");
     }
 }

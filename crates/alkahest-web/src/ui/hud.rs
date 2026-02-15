@@ -4,7 +4,7 @@ use crate::tools::ToolState;
 pub fn show(
     ctx: &egui::Context,
     tool_state: &ToolState,
-    material_names: &[&str],
+    material_names: &[String],
     sim_speed: f32,
     sim_paused: bool,
 ) {
@@ -12,9 +12,10 @@ pub fn show(
         .anchor(egui::Align2::RIGHT_TOP, egui::vec2(-8.0, 8.0))
         .show(ctx, |ui| {
             egui::Frame::popup(ui.style()).show(ui, |ui| {
+                let unknown = "?".to_string();
                 let mat_name = material_names
                     .get(tool_state.place_material as usize)
-                    .unwrap_or(&"?");
+                    .unwrap_or(&unknown);
 
                 let tool_name = match tool_state.active {
                     crate::tools::ActiveTool::Place => "Place",

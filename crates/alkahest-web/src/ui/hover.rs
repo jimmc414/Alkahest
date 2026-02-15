@@ -1,7 +1,7 @@
 use alkahest_render::PickResult;
 
 /// Voxel hover info panel. Shows data from the GPU pick buffer when valid.
-pub fn show(ctx: &egui::Context, pick: &PickResult, material_names: &[&str]) {
+pub fn show(ctx: &egui::Context, pick: &PickResult, material_names: &[String]) {
     if !pick.valid {
         return;
     }
@@ -12,9 +12,10 @@ pub fn show(ctx: &egui::Context, pick: &PickResult, material_names: &[&str]) {
         .collapsible(false)
         .title_bar(false)
         .show(ctx, |ui| {
+            let unknown = "Unknown".to_string();
             let mat_name = material_names
                 .get(pick.material_id as usize)
-                .unwrap_or(&"Unknown");
+                .unwrap_or(&unknown);
 
             ui.label(format!("{} (ID: {})", mat_name, pick.material_id));
             ui.label(format!(
