@@ -3,6 +3,7 @@ mod camera;
 mod commands;
 mod gpu;
 mod input;
+mod storage;
 mod tools;
 pub mod ui;
 

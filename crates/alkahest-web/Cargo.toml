@@ -8,6 +8,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 alkahest-core = { path = "../alkahest-core" }
+alkahest-persist = { path = "../alkahest-persist" }
 alkahest-render = { path = "../alkahest-render" }
 alkahest-rules = { path = "../alkahest-rules" }
 alkahest-sim = { path = "../alkahest-sim" }
@@ -42,4 +43,12 @@ web-sys = { workspace = true, features = [
     "PointerEvent",
     "AddEventListenerOptions",
     "console",
+    "Blob",
+    "BlobPropertyBag",
+    "Url",
+    "HtmlInputElement",
+    "HtmlAnchorElement",
+    "FileReader",
+    "File",
+    "FileList",
 ] }
