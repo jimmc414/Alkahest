@@ -28,6 +28,19 @@ struct ReactionUniforms {
     _pad5: u32,
 }
 
+/// Per-pass timing breakdown from an instrumented tick.
+/// Only available via `tick_instrumented()` which serializes GPU work (not for game loop).
+#[derive(Debug, Clone, Default)]
+pub struct TickTimings {
+    pub commands_ms: f64,
+    pub movement_ms: f64,
+    pub reactions_ms: f64,
+    pub thermal_ms: f64,
+    pub pressure_ms: f64,
+    pub activity_ms: f64,
+    pub total_ms: f64,
+}
+
 /// Single public struct owning the entire simulation pipeline.
 ///
 /// All GPU resources created at init time (C-PERF-2).
@@ -698,6 +711,333 @@ impl SimPipeline {
         self.request_readback(encoder, active_chunk_count);
 
         true
+    }
+
+    /// Run one instrumented simulation tick, timing each pass individually.
+    ///
+    /// This serializes GPU work by submitting each pass as a separate command buffer
+    /// with `device.poll(Maintain::Wait)` between them. This destroys GPU pipelining
+    /// and is only suitable for profiling — never use in the game loop.
+    ///
+    /// Returns timing breakdown per pass, or None if the sim is paused.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn tick_instrumented(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        active_chunk_count: u32,
+        active_slots: &[u32],
+    ) -> Option<TickTimings> {
+        use std::time::Instant;
+
+        if self.paused && !self.single_step_requested {
+            self.pending_commands.clear();
+            return None;
+        }
+        self.single_step_requested = false;
+
+        if active_chunk_count == 0 {
+            self.pending_commands.clear();
+            return Some(TickTimings::default());
+        }
+
+        let total_start = Instant::now();
+        let command_count = self.pending_commands.len() as u32;
+
+        // Copy read pool → write pool
+        {
+            let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("instrumented-copy"),
+            });
+            for &slot in active_slots {
+                self.chunk_pool.copy_slot_read_to_write(&mut encoder, slot);
+            }
+            queue.submit(std::iter::once(encoder.finish()));
+            device.poll(wgpu::Maintain::Wait);
+        }
+
+        // Create bind group
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("sim-bind-group-instrumented"),
+            layout: &self.bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: self.chunk_pool.read_pool().as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: self.chunk_pool.write_pool().as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: self.material_props_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: self.command_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: self.uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 5,
+                    resource: self.rule_lookup_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 6,
+                    resource: self.rule_data_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 7,
+                    resource: self.chunk_desc_buffer.as_entire_binding(),
+                },
+            ],
+        });
+
+        let mut timings = TickTimings::default();
+
+        // Pass 1: Commands
+        {
+            let start = Instant::now();
+            if command_count > 0 {
+                let params = SimParams {
+                    tick: self.tick_count as u32,
+                    command_count,
+                    _pad0: 0,
+                    _pad1: 0,
+                };
+                queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&params));
+
+                let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("instrumented-commands"),
+                });
+                let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                    label: Some("instrumented-commands-pass"),
+                    timestamp_writes: None,
+                });
+                commands::dispatch_commands(
+                    &mut pass,
+                    &self.command_pipeline,
+                    &bind_group,
+                    command_count,
+                );
+                drop(pass);
+                queue.submit(std::iter::once(encoder.finish()));
+                device.poll(wgpu::Maintain::Wait);
+            }
+            timings.commands_ms = start.elapsed().as_secs_f64() * 1000.0;
+        }
+
+        // Pass 2: Movement
+        {
+            let start = Instant::now();
+            for sub_pass in &self.movement_schedule.clone() {
+                let uniforms = MovementUniforms {
+                    direction: sub_pass.direction,
+                    parity: sub_pass.parity,
+                    tick: self.tick_count as u32,
+                    _pad: [0; 3],
+                };
+                queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
+
+                let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("instrumented-movement"),
+                });
+                let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                    label: Some("instrumented-movement-pass"),
+                    timestamp_writes: None,
+                });
+                movement::dispatch_movement(
+                    &mut pass,
+                    &self.movement_pipeline,
+                    &bind_group,
+                    active_chunk_count,
+                );
+                drop(pass);
+                queue.submit(std::iter::once(encoder.finish()));
+                device.poll(wgpu::Maintain::Wait);
+            }
+            timings.movement_ms = start.elapsed().as_secs_f64() * 1000.0;
+        }
+
+        // Pass 3: Reactions
+        {
+            let start = Instant::now();
+            let uniforms = ReactionUniforms {
+                tick: self.tick_count as u32,
+                material_count: self.material_count,
+                _pad0: 0,
+                _pad1: 0,
+                _pad2: 0,
+                _pad3: 0,
+                _pad4: 0,
+                _pad5: 0,
+            };
+            queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
+
+            let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("instrumented-reactions"),
+            });
+            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("instrumented-reactions-pass"),
+                timestamp_writes: None,
+            });
+            reactions::dispatch_reactions(
+                &mut pass,
+                &self.reaction_pipeline,
+                &bind_group,
+                active_chunk_count,
+            );
+            drop(pass);
+            queue.submit(std::iter::once(encoder.finish()));
+            device.poll(wgpu::Maintain::Wait);
+            timings.reactions_ms = start.elapsed().as_secs_f64() * 1000.0;
+        }
+
+        // Pass 4: Thermal
+        {
+            let start = Instant::now();
+            let uniforms = ReactionUniforms {
+                tick: self.tick_count as u32,
+                material_count: self.material_count,
+                _pad0: 0,
+                _pad1: 0,
+                _pad2: 0,
+                _pad3: 0,
+                _pad4: 0,
+                _pad5: 0,
+            };
+            queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
+
+            let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("instrumented-thermal"),
+            });
+            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("instrumented-thermal-pass"),
+                timestamp_writes: None,
+            });
+            thermal::dispatch_thermal(
+                &mut pass,
+                &self.thermal_pipeline,
+                &bind_group,
+                active_chunk_count,
+            );
+            drop(pass);
+            queue.submit(std::iter::once(encoder.finish()));
+            device.poll(wgpu::Maintain::Wait);
+            timings.thermal_ms = start.elapsed().as_secs_f64() * 1000.0;
+        }
+
+        // Pass 5: Pressure
+        {
+            let start = Instant::now();
+            let uniforms = ReactionUniforms {
+                tick: self.tick_count as u32,
+                material_count: self.material_count,
+                _pad0: 0,
+                _pad1: 0,
+                _pad2: 0,
+                _pad3: 0,
+                _pad4: 0,
+                _pad5: 0,
+            };
+            queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
+
+            let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("instrumented-pressure"),
+            });
+            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("instrumented-pressure-pass"),
+                timestamp_writes: None,
+            });
+            pressure::dispatch_pressure(
+                &mut pass,
+                &self.pressure_pipeline,
+                &bind_group,
+                active_chunk_count,
+            );
+            drop(pass);
+            queue.submit(std::iter::once(encoder.finish()));
+            device.poll(wgpu::Maintain::Wait);
+            timings.pressure_ms = start.elapsed().as_secs_f64() * 1000.0;
+        }
+
+        // Pass 6: Activity scan
+        {
+            let start = Instant::now();
+            let activity_uniforms = ReactionUniforms {
+                tick: self.tick_count as u32,
+                material_count: active_chunk_count,
+                _pad0: 0,
+                _pad1: 0,
+                _pad2: 0,
+                _pad3: 0,
+                _pad4: 0,
+                _pad5: 0,
+            };
+            queue.write_buffer(
+                &self.uniform_buffer,
+                0,
+                bytemuck::bytes_of(&activity_uniforms),
+            );
+
+            let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("instrumented-activity"),
+            });
+            encoder.clear_buffer(&self.activity_flags_buffer, 0, None);
+
+            let activity_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("activity-bind-group-instrumented"),
+                layout: &self.activity_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: self.chunk_pool.read_pool().as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: self.chunk_pool.write_pool().as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: self.activity_flags_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 3,
+                        resource: self.uniform_buffer.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 4,
+                        resource: self.chunk_desc_buffer.as_entire_binding(),
+                    },
+                ],
+            });
+
+            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("instrumented-activity-pass"),
+                timestamp_writes: None,
+            });
+            crate::passes::activity::dispatch_activity(
+                &mut pass,
+                &self.activity_pipeline,
+                &activity_bind_group,
+                active_chunk_count,
+            );
+            drop(pass);
+            queue.submit(std::iter::once(encoder.finish()));
+            device.poll(wgpu::Maintain::Wait);
+            timings.activity_ms = start.elapsed().as_secs_f64() * 1000.0;
+        }
+
+        // Swap and increment
+        self.chunk_pool.swap();
+        self.tick_count += 1;
+        self.pending_commands.clear();
+
+        timings.total_ms = total_start.elapsed().as_secs_f64() * 1000.0;
+        Some(timings)
     }
 
     /// Copy activity flags to staging buffer and initiate async readback (C-GPU-8).
