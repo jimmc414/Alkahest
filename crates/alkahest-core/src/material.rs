@@ -66,6 +66,12 @@ pub struct MaterialDef {
     /// 0.0 = no structural role (powders, gases). Higher = stronger containment.
     #[serde(default)]
     pub structural_integrity: f32,
+    /// Opacity (0.0–1.0). None = derive from phase (Gas=0.3, Liquid=0.7, Solid/Powder=1.0).
+    #[serde(default)]
+    pub opacity: Option<f32>,
+    /// Depth-dependent color absorption rate for transparent materials (e.g. water darkening).
+    #[serde(default)]
+    pub absorption_rate: f32,
 }
 
 /// Collection of material definitions indexed by ID.
@@ -128,6 +134,8 @@ mod tests {
                 phase_change_temp: 0.0,
                 phase_change_product: 0,
                 structural_integrity: 0.0,
+                opacity: None,
+                absorption_rate: 0.0,
             }],
         };
         assert!(table.get(2).is_some());

@@ -122,13 +122,17 @@ impl Application {
             }
         }
 
-        // Update renderer material colors from compiled data
+        // Update renderer material colors from compiled data (32 bytes per entry)
         let material_colors: Vec<MaterialColor> = rule_data
             .material_colors
             .iter()
             .map(|c| MaterialColor {
                 color: c.color,
+                opacity: c.opacity,
                 emission: c.emission,
+                absorption_rate: c.absorption_rate,
+                phase: c.phase,
+                _padding: c._padding,
             })
             .collect();
         renderer.update_material_colors(&gpu.device, &material_colors);
@@ -1207,6 +1211,7 @@ impl Application {
             cursor_y,
         );
         renderer.update_camera(&gpu.queue, cam_uniforms);
+        renderer.update_lights(&gpu.queue);
 
         // Upload debug line view-projection matrix
         let vp = camera.view_proj(width as f32, height as f32);

@@ -49,6 +49,8 @@
         density: 3200.0,
         color: (0.3, 0.5, 1.0),
         emission: 3.0,
+        opacity: Some(0.7),
+        absorption_rate: 0.08,
         thermal_conductivity: 0.4,
         structural_integrity: 45.0,
     ),
@@ -68,6 +70,7 @@
         density: 0.001,
         color: (0.6, 0.7, 0.9),
         emission: 0.5,
+        opacity: Some(0.15),
         thermal_conductivity: 0.01,
     ),
     (
@@ -96,6 +99,7 @@
         density: 0.05,
         color: (0.9, 0.4, 0.7),
         emission: 3.5,
+        opacity: Some(0.2),
         thermal_conductivity: 0.02,
     ),
     (
@@ -172,6 +176,8 @@
         density: 1500.0,
         color: (1.0, 0.95, 0.8),
         emission: 5.0,
+        opacity: Some(0.6),
+        absorption_rate: 0.03,
         thermal_conductivity: 0.9,
         structural_integrity: 30.0,
     ),
@@ -181,6 +187,7 @@
         phase: Powder,
         density: 50.0,
         color: (0.03, 0.02, 0.05),
+        opacity: Some(0.4),
         thermal_conductivity: 0.02,
     ),
     (

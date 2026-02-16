@@ -96,3 +96,17 @@ pub const THERMAL_PRESSURE_FACTOR: u32 = 1;
 
 /// Maximum BFS radius for structural collapse detection (CPU-side).
 pub const STRUCTURAL_BFS_RADIUS: u32 = 32;
+
+// ── M10: Rendering Polish Constants ─────────────────────────────────
+
+/// Maximum number of dynamic point lights extracted from emissive voxels.
+pub const MAX_DYNAMIC_LIGHTS: u32 = 64;
+
+/// Maximum shadow rays traced per pixel (C-RENDER-4: budget ≤ 8).
+pub const MAX_SHADOW_RAYS_PER_PIXEL: u32 = 4;
+
+/// Maximum transparent voxel traversals per ray before cutoff.
+pub const MAX_TRANSPARENT_STEPS: u32 = 32;
+
+/// LOD distance threshold in voxels. Beyond this, use octree averaged color.
+pub const LOD_DISTANCE_THRESHOLD: f32 = 128.0;

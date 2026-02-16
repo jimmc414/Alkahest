@@ -6,12 +6,17 @@ use alkahest_core::math::temp_to_quantized;
 use alkahest_core::rule::RuleSet;
 use wgpu::util::DeviceExt;
 
-/// Color + emission data extracted from material definitions for the renderer.
+/// Color + rendering data extracted from material definitions for the renderer.
+/// 32 bytes per entry, matching the GPU MaterialColor struct.
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct CompiledMaterialColor {
     pub color: [f32; 3],
+    pub opacity: f32,
     pub emission: f32,
+    pub absorption_rate: f32,
+    pub phase: f32,
+    pub _padding: f32,
 }
 
 /// Compiled GPU rule data ready for upload. Created once at init (C-PERF-2).
@@ -251,11 +256,15 @@ pub fn compile(device: &wgpu::Device, materials: &MaterialTable, rules: &RuleSet
         usage: wgpu::BufferUsages::STORAGE,
     });
 
-    // Build material colors for the renderer
+    // Build material colors for the renderer (32 bytes per entry)
     let mut material_colors = vec![
         CompiledMaterialColor {
             color: [0.0, 0.0, 0.0],
+            opacity: 0.0,
             emission: 0.0,
+            absorption_rate: 0.0,
+            phase: 0.0,
+            _padding: 0.0,
         };
         material_count as usize
     ];
@@ -263,9 +272,20 @@ pub fn compile(device: &wgpu::Device, materials: &MaterialTable, rules: &RuleSet
     for mat in &materials.materials {
         let idx = mat.id as usize;
         if idx < material_colors.len() {
+            let opacity = mat.opacity.unwrap_or(match mat.phase {
+                alkahest_core::material::Phase::Gas => 0.3,
+                alkahest_core::material::Phase::Liquid => 0.7,
+                alkahest_core::material::Phase::Solid | alkahest_core::material::Phase::Powder => {
+                    1.0
+                }
+            });
             material_colors[idx] = CompiledMaterialColor {
                 color: [mat.color.0, mat.color.1, mat.color.2],
+                opacity,
                 emission: mat.emission,
+                absorption_rate: mat.absorption_rate,
+                phase: mat.phase.as_f32(),
+                _padding: 0.0,
             };
         }
     }
@@ -309,6 +329,8 @@ mod tests {
                     phase_change_temp: 0.0,
                     phase_change_product: 0,
                     structural_integrity: 0.0,
+                    opacity: None,
+                    absorption_rate: 0.0,
                 },
                 MaterialDef {
                     id: 1,
@@ -327,6 +349,8 @@ mod tests {
                     phase_change_temp: 0.0,
                     phase_change_product: 0,
                     structural_integrity: 63.0,
+                    opacity: None,
+                    absorption_rate: 0.0,
                 },
             ],
         }

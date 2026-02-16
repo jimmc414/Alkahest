@@ -195,6 +195,8 @@ mod tests {
             phase_change_temp: 0.0,
             phase_change_product: 0,
             structural_integrity: 0.0,
+            opacity: None,
+            absorption_rate: 0.0,
         }
     }
 

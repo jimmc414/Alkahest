@@ -139,6 +139,8 @@ mod tests {
                     phase_change_temp: 0.0,
                     phase_change_product: 0,
                     structural_integrity: 0.0,
+                    opacity: None,
+                    absorption_rate: 0.0,
                 },
                 MaterialDef {
                     id: 1,
@@ -157,6 +159,8 @@ mod tests {
                     phase_change_temp: 0.0,
                     phase_change_product: 0,
                     structural_integrity: 50.0,
+                    opacity: None,
+                    absorption_rate: 0.0,
                 },
                 MaterialDef {
                     id: 2,
@@ -175,6 +179,8 @@ mod tests {
                     phase_change_temp: 0.0,
                     phase_change_product: 0,
                     structural_integrity: 0.0,
+                    opacity: None,
+                    absorption_rate: 0.0,
                 },
                 MaterialDef {
                     id: 3,
@@ -193,6 +199,8 @@ mod tests {
                     phase_change_temp: 373.0,
                     phase_change_product: 7,
                     structural_integrity: 0.0,
+                    opacity: Some(0.5),
+                    absorption_rate: 0.15,
                 },
             ],
         }

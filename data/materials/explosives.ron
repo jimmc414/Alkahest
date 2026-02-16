@@ -28,6 +28,8 @@
         density: 2500.0,
         color: (0.8, 0.9, 0.95),
         emission: 0.05,
+        opacity: Some(0.4),
+        absorption_rate: 0.02,
         thermal_conductivity: 0.7,
         structural_integrity: 8.0,
     ),

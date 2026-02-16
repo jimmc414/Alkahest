@@ -1,6 +1,7 @@
 // blit.wgsl — Fullscreen triangle to copy compute output to the surface.
+// M10: Adds Reinhard tone mapping + sRGB gamma correction for HDR rendering.
 // Uses the 3-vertex fullscreen triangle trick (no vertex buffer needed).
-// Bind group: render texture + nearest-neighbor sampler.
+// Bind group: render texture (rgba16float HDR) + nearest-neighbor sampler.
 
 @group(0) @binding(0) var render_tex: texture_2d<f32>;
 @group(0) @binding(1) var render_sampler: sampler;
@@ -23,5 +24,13 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return textureSample(render_tex, render_sampler, in.uv);
+    var color = textureSample(render_tex, render_sampler, in.uv).rgb;
+
+    // Reinhard tone mapping (HDR -> LDR)
+    color = color / (color + vec3(1.0));
+
+    // sRGB gamma correction (linear -> sRGB)
+    color = pow(color, vec3(1.0 / 2.2));
+
+    return vec4<f32>(color, 1.0);
 }

@@ -2,6 +2,7 @@ use alkahest_core::constants::*;
 use wgpu::util::DeviceExt;
 
 use crate::debug_lines::DebugVertex;
+use crate::lighting::{LightConfig, LightManager};
 use crate::pick::PickBuffer;
 
 /// Maximum number of debug line vertices the buffer can hold.
@@ -26,21 +27,18 @@ pub struct CameraUniforms {
     pub cursor_packed: u32,
 }
 
-/// GPU-uploadable light uniforms. Must match LightUniforms in ray_march.wgsl.
-#[repr(C)]
-#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct LightUniforms {
-    pub position: [f32; 4],
-    pub color: [f32; 4],
-    pub ambient: [f32; 4],
-}
+// LightConfig and LightManager are in crate::lighting
 
-/// GPU-uploadable material color. Must match MaterialColor in ray_march.wgsl.
+/// GPU-uploadable material color (32 bytes). Must match MaterialColor in ray_march.wgsl.
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct MaterialColor {
     pub color: [f32; 3],
+    pub opacity: f32,
     pub emission: f32,
+    pub absorption_rate: f32,
+    pub phase: f32,
+    pub _padding: f32,
 }
 
 /// GPU-uploadable debug line view-projection uniform.
@@ -77,8 +75,9 @@ pub struct Renderer {
     debug_uniform_buffer: wgpu::Buffer,
     // Uniform buffers
     camera_uniform_buffer: wgpu::Buffer,
-    #[allow(dead_code)] // Kept for future dynamic light updates
-    light_uniform_buffer: wgpu::Buffer,
+    light_config_buffer: wgpu::Buffer,
+    // Multi-light system
+    pub light_manager: LightManager,
     // Scene
     voxel_pool_buffer: wgpu::Buffer,
     material_color_buffer: wgpu::Buffer,
@@ -120,9 +119,12 @@ impl Renderer {
         let blit_wgsl = include_str!("../../../shaders/render/blit.wgsl");
         let debug_lines_wgsl = include_str!("../../../shaders/render/debug_lines.wgsl");
 
-        // Compose ray march shader: constants + types + coords + ray_march
-        let ray_march_source =
-            format!("{constants_preamble}\n{types_wgsl}\n{coords_wgsl}\n{ray_march_wgsl}");
+        let sky_wgsl = include_str!("../../../shaders/render/sky.wgsl");
+
+        // Compose ray march shader: constants + types + coords + sky + ray_march
+        let ray_march_source = format!(
+            "{constants_preamble}\n{types_wgsl}\n{coords_wgsl}\n{sky_wgsl}\n{ray_march_wgsl}"
+        );
 
         // -- Create shader modules --
         let ray_march_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -148,15 +150,13 @@ impl Renderer {
             mapped_at_creation: false,
         });
 
-        let light_uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("light-uniforms"),
-            contents: bytemuck::bytes_of(&LightUniforms {
-                position: [28.5, 22.0, 28.5, 1.0],
-                color: [1.0, 0.95, 0.8, 1.0],
-                ambient: [0.15, 0.15, 0.18, 1.0],
-            }),
+        let light_config_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("light-config"),
+            contents: bytemuck::bytes_of(&LightConfig::default()),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
+
+        let light_manager = LightManager::new(device);
 
         // -- Voxel pool buffer placeholder (will be replaced by sim pipeline's pool buffer) --
         let voxel_pool_buffer = device.create_buffer(&wgpu::BufferDescriptor {
@@ -179,7 +179,7 @@ impl Renderer {
         // -- Octree buffer placeholder (will be filled later) --
         let octree_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("octree-nodes"),
-            size: 1024 * 8, // 8192 bytes initial placeholder
+            size: 1024 * 16, // 16384 bytes initial placeholder (16 bytes per node)
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -200,6 +200,7 @@ impl Renderer {
         let uniform_bgl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("uniform-bgl"),
             entries: &[
+                // binding 0: CameraUniforms (uniform)
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
                     visibility: wgpu::ShaderStages::COMPUTE,
@@ -210,11 +211,23 @@ impl Renderer {
                     },
                     count: None,
                 },
+                // binding 1: LightConfig (uniform)
                 wgpu::BindGroupLayoutEntry {
                     binding: 1,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                // binding 2: light_array (storage, read)
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
                         has_dynamic_offset: false,
                         min_binding_size: None,
                     },
@@ -248,13 +261,13 @@ impl Renderer {
                     },
                     count: None,
                 },
-                // binding 2: output_texture (storage texture, write, rgba8unorm)
+                // binding 2: output_texture (storage texture, write, rgba16float for HDR)
                 wgpu::BindGroupLayoutEntry {
                     binding: 2,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::StorageTexture {
                         access: wgpu::StorageTextureAccess::WriteOnly,
-                        format: wgpu::TextureFormat::Rgba8Unorm,
+                        format: wgpu::TextureFormat::Rgba16Float,
                         view_dimension: wgpu::TextureViewDimension::D2,
                     },
                     count: None,
@@ -306,7 +319,11 @@ impl Renderer {
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: light_uniform_buffer.as_entire_binding(),
+                    resource: light_config_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: light_manager.light_buffer.as_entire_binding(),
                 },
             ],
         });
@@ -536,7 +553,8 @@ impl Renderer {
             debug_uniform_bind_group,
             debug_uniform_buffer,
             camera_uniform_buffer,
-            light_uniform_buffer,
+            light_config_buffer,
+            light_manager,
             voxel_pool_buffer,
             material_color_buffer,
             chunk_map_buffer,
@@ -664,6 +682,16 @@ impl Renderer {
         );
     }
 
+    /// Upload light configuration and light array each frame.
+    pub fn update_lights(&self, queue: &wgpu::Queue) {
+        queue.write_buffer(
+            &self.light_config_buffer,
+            0,
+            bytemuck::bytes_of(&self.light_manager.config),
+        );
+        self.light_manager.upload(queue);
+    }
+
     /// Upload debug line view-projection matrix each frame.
     pub fn update_debug_uniforms(&self, queue: &wgpu::Queue, view_proj: [[f32; 4]; 4]) {
         let uniforms = DebugUniforms { view_proj };
@@ -749,7 +777,7 @@ impl Renderer {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm,
+            format: wgpu::TextureFormat::Rgba16Float,
             usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING,
             view_formats: &[],
         });
@@ -807,62 +835,110 @@ impl Renderer {
             // 0: Air (never rendered, but need valid entry)
             MaterialColor {
                 color: [0.0, 0.0, 0.0],
+                opacity: 0.0,
                 emission: 0.0,
+                absorption_rate: 0.0,
+                phase: 0.0,
+                _padding: 0.0,
             },
             // 1: Stone
             MaterialColor {
                 color: [0.5, 0.5, 0.55],
+                opacity: 1.0,
                 emission: 0.0,
+                absorption_rate: 0.0,
+                phase: 2.0,
+                _padding: 0.0,
             },
             // 2: Sand
             MaterialColor {
                 color: [0.76, 0.70, 0.50],
+                opacity: 1.0,
                 emission: 0.0,
+                absorption_rate: 0.0,
+                phase: 3.0,
+                _padding: 0.0,
             },
             // 3: Water
             MaterialColor {
                 color: [0.2, 0.4, 0.8],
+                opacity: 0.5,
                 emission: 0.1,
+                absorption_rate: 0.15,
+                phase: 1.0,
+                _padding: 0.0,
             },
             // 4: Oil
             MaterialColor {
                 color: [0.3, 0.2, 0.05],
+                opacity: 0.7,
                 emission: 0.0,
+                absorption_rate: 0.2,
+                phase: 1.0,
+                _padding: 0.0,
             },
             // 5: Fire
             MaterialColor {
                 color: [1.0, 0.5, 0.1],
+                opacity: 0.3,
                 emission: 5.0,
+                absorption_rate: 0.0,
+                phase: 0.0,
+                _padding: 0.0,
             },
             // 6: Smoke
             MaterialColor {
                 color: [0.3, 0.3, 0.3],
+                opacity: 0.15,
                 emission: 0.0,
+                absorption_rate: 0.0,
+                phase: 0.0,
+                _padding: 0.0,
             },
             // 7: Steam
             MaterialColor {
                 color: [0.85, 0.85, 0.9],
+                opacity: 0.2,
                 emission: 0.05,
+                absorption_rate: 0.0,
+                phase: 0.0,
+                _padding: 0.0,
             },
             // 8: Wood
             MaterialColor {
                 color: [0.45, 0.28, 0.12],
+                opacity: 1.0,
                 emission: 0.0,
+                absorption_rate: 0.0,
+                phase: 2.0,
+                _padding: 0.0,
             },
             // 9: Ash
             MaterialColor {
                 color: [0.7, 0.7, 0.65],
+                opacity: 1.0,
                 emission: 0.0,
+                absorption_rate: 0.0,
+                phase: 3.0,
+                _padding: 0.0,
             },
             // 10: Ice
             MaterialColor {
                 color: [0.7, 0.85, 0.95],
+                opacity: 0.85,
                 emission: 0.1,
+                absorption_rate: 0.05,
+                phase: 2.0,
+                _padding: 0.0,
             },
             // 11: Lava
             MaterialColor {
                 color: [1.0, 0.3, 0.0],
+                opacity: 1.0,
                 emission: 4.0,
+                absorption_rate: 0.0,
+                phase: 1.0,
+                _padding: 0.0,
             },
         ]
     }

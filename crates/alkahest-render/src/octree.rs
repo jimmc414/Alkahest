@@ -3,7 +3,8 @@ use alkahest_core::types::ChunkCoord;
 use glam::IVec3;
 
 /// Node in the flat-array sparse voxel octree.
-/// Packed as 2 × u32 for GPU upload.
+/// Packed as 4 × u32 (16 bytes) for GPU upload.
+/// M10: Expanded from 8 to 16 bytes to store averaged color for LOD rendering.
 #[derive(Debug, Clone, Copy, Default)]
 #[repr(C)]
 pub struct OctreeNode {
@@ -14,6 +15,12 @@ pub struct OctreeNode {
     /// Children are stored contiguously; use popcount(child_mask & ((1 << i) - 1))
     /// to find the offset of child i.
     pub first_child_offset: u32,
+    /// Average color of all occupied voxels in this subtree, packed as R8G8B8A8.
+    /// Used for LOD rendering at distance. A=0 means no color data available.
+    pub avg_color_packed: u32,
+    /// Occupancy ratio: fraction of voxels that are non-air, packed as u32 fixed-point
+    /// (0 = empty, u32::MAX = fully solid). Used for LOD density estimation.
+    pub avg_density: u32,
 }
 
 impl OctreeNode {
@@ -258,15 +265,19 @@ impl Octree {
     }
 
     /// Get the raw node data for GPU upload.
-    /// Returns pairs of u32 values per node.
+    /// Returns 4 × u32 values per node (16 bytes each).
     pub fn gpu_data(&self) -> Vec<u32> {
-        let mut data = Vec::with_capacity(self.nodes.len() * 2);
+        let mut data = Vec::with_capacity(self.nodes.len() * 4);
         for node in &self.nodes {
             data.push(node.mask_and_flags);
             data.push(node.first_child_offset);
+            data.push(node.avg_color_packed);
+            data.push(node.avg_density);
         }
         // Ensure at least one node (empty root) for valid buffer binding
         if data.is_empty() {
+            data.push(0);
+            data.push(0);
             data.push(0);
             data.push(0);
         }
@@ -317,7 +328,7 @@ mod tests {
         let chunks = vec![(IVec3::new(0, 0, 0), true)];
         octree.rebuild(&chunks);
         let data = octree.gpu_data();
-        assert_eq!(data.len() % 2, 0); // pairs of u32
-        assert!(data.len() >= 2); // at least root node
+        assert_eq!(data.len() % 4, 0); // quads of u32 (16 bytes per node)
+        assert!(data.len() >= 4); // at least root node
     }
 }
