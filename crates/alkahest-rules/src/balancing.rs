@@ -6,7 +6,9 @@
 #[cfg(test)]
 mod tests {
     use crate::defaults;
-    use crate::loader::{load_all_materials, load_all_rules};
+    use crate::loader::{load_all_materials, load_all_rules, load_mod, merge_mod};
+    use crate::migration::IdRemap;
+    use crate::validator;
     use std::collections::{HashMap, HashSet};
 
     fn load_all() -> (
@@ -397,5 +399,56 @@ mod tests {
             "Categories with no interaction rules: {:?}",
             missing
         );
+    }
+
+    /// Verify that loading base + example mod passes balancing checks:
+    /// mod material IDs are valid, merged materials validate, no runaway
+    /// temperature in mod rules, and no duplicate IDs after merge.
+    #[test]
+    fn test_mod_materials_pass_balancing() {
+        let (mut table, mut rules) = load_all();
+
+        let mod_manifest_ron = include_str!("../../../data/mods/example-mod/mod.ron");
+        let mod_materials_ron =
+            include_str!("../../../data/mods/example-mod/materials/crystals.ron");
+        let mod_rules_ron =
+            include_str!("../../../data/mods/example-mod/rules/crystal_interactions.ron");
+
+        let mod_result = load_mod(mod_manifest_ron, &[mod_materials_ron], &[mod_rules_ron])
+            .expect("example mod should load");
+
+        // Validate mod IDs are in range before remapping
+        validator::validate_mod_materials(&mod_result.materials)
+            .expect("mod material IDs should be in valid range");
+
+        // Merge mod into base
+        let mut remap = IdRemap::new(table.max_id());
+        let _warnings = merge_mod(&mut table, &mut rules, &mod_result, &mut remap);
+
+        // Merged material table must pass property validation (IDs unique, ranges OK)
+        validator::validate_materials(&table).expect("merged materials should validate");
+
+        // All mod rule material references must exist in the merged table
+        let valid_ids: HashSet<u16> = table.materials.iter().map(|m| m.id).collect();
+        for rule in &rules.rules {
+            for &id in &[rule.input_a, rule.input_b, rule.output_a, rule.output_b] {
+                assert!(
+                    valid_ids.contains(&id),
+                    "Rule '{}' references unknown material ID {}",
+                    rule.name,
+                    id
+                );
+            }
+        }
+
+        // Verify no rules have runaway temperature
+        for rule in &rules.rules {
+            assert!(
+                rule.temp_delta <= 4095,
+                "Rule '{}': temp_delta {} exceeds quantization max 4095",
+                rule.name,
+                rule.temp_delta
+            );
+        }
     }
 }
