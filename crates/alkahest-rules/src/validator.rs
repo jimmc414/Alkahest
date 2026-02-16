@@ -4,10 +4,14 @@ use alkahest_core::rule::RuleSet;
 use std::collections::HashSet;
 use thiserror::Error;
 
+use crate::defaults::MOD_ID_START;
+
 #[derive(Debug, Error)]
 pub enum ValidationError {
     #[error("Duplicate material ID {0}")]
     DuplicateMaterialId(u16),
+    #[error("Mod material '{name}' has ID {id} below mod range (must be >= {min})")]
+    ModIdOutOfRange { name: String, id: u16, min: u16 },
     #[error("Material '{name}' ignition_temp {value}K exceeds max {max}K (C-DATA-4)")]
     IgnitionTempExceedsMax { name: String, value: f32, max: f32 },
     #[error("Material '{name}' decay_threshold {value} exceeds quantization max {max} (C-DATA-4)")]
@@ -162,6 +166,33 @@ pub fn validate_rules(
                 }
             }
         }
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
+    }
+}
+
+/// Validate that all materials in the table have IDs in the mod range (>= MOD_ID_START).
+/// Also runs standard property range checks. Use this on mod material tables *before* remapping.
+pub fn validate_mod_materials(table: &MaterialTable) -> Result<(), Vec<ValidationError>> {
+    let mut errors = Vec::new();
+
+    for mat in &table.materials {
+        if mat.id < MOD_ID_START {
+            errors.push(ValidationError::ModIdOutOfRange {
+                name: mat.name.clone(),
+                id: mat.id,
+                min: MOD_ID_START,
+            });
+        }
+    }
+
+    // Also run standard property checks
+    if let Err(prop_errors) = validate_materials(table) {
+        errors.extend(prop_errors);
     }
 
     if errors.is_empty() {
@@ -395,5 +426,53 @@ mod tests {
         };
         let result = validate_materials(&table);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_mod_id_below_range_rejected() {
+        let table = MaterialTable {
+            materials: vec![{
+                let mut m = make_material(500, "BadModMaterial");
+                m.thermal_conductivity = 0.3;
+                m
+            }],
+        };
+        let result = validate_mod_materials(&table);
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors
+            .iter()
+            .any(|e| matches!(e, ValidationError::ModIdOutOfRange { id: 500, .. })));
+    }
+
+    #[test]
+    fn test_mod_valid_id_accepted() {
+        let table = MaterialTable {
+            materials: vec![{
+                let mut m = make_material(10001, "GoodModMaterial");
+                m.thermal_conductivity = 0.3;
+                m
+            }],
+        };
+        let result = validate_mod_materials(&table);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_mod_duplicate_with_base_detected_after_merge() {
+        // After merging, if a mod material ID collides with a base ID,
+        // validate_materials catches it as DuplicateMaterialId
+        let table = MaterialTable {
+            materials: vec![
+                make_material(1, "Stone"),
+                make_material(1, "ModStone"), // duplicate ID after (hypothetical bad) merge
+            ],
+        };
+        let result = validate_materials(&table);
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors
+            .iter()
+            .any(|e| matches!(e, ValidationError::DuplicateMaterialId(1))));
     }
 }
