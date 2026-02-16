@@ -251,6 +251,45 @@ impl BenchmarkRunner {
         ])
         .expect("failed to parse rules RON data");
 
+        let mut materials = materials;
+        let mut rules = rules;
+
+        // Load example mod (same pattern as app.rs)
+        {
+            let mod_manifest_ron = include_str!("../../../data/mods/example-mod/mod.ron");
+            let mod_materials_ron =
+                include_str!("../../../data/mods/example-mod/materials/crystals.ron");
+            let mod_rules_ron =
+                include_str!("../../../data/mods/example-mod/rules/crystal_interactions.ron");
+
+            let mod_result = alkahest_rules::loader::load_mod(
+                mod_manifest_ron,
+                &[mod_materials_ron],
+                &[mod_rules_ron],
+            )
+            .expect("failed to load example mod");
+
+            if let Err(errors) =
+                alkahest_rules::validator::validate_mod_materials(&mod_result.materials)
+            {
+                for e in &errors {
+                    log::error!("Mod validation error: {e}");
+                }
+                panic!("Mod validation failed with {} errors", errors.len());
+            }
+
+            let mut remap = alkahest_rules::migration::IdRemap::new(materials.max_id());
+            let warnings = alkahest_rules::loader::merge_mod(
+                &mut materials,
+                &mut rules,
+                &mod_result,
+                &mut remap,
+            );
+            for w in &warnings {
+                log::warn!("{w}");
+            }
+        }
+
         if let Err(errors) = alkahest_rules::validator::validate_materials(&materials) {
             for e in &errors {
                 log::error!("Material validation error: {e}");
