@@ -50,7 +50,7 @@ mod tests {
         let (table, rules) = load_all();
 
         // Materials allowed to self-replicate by design:
-        // - Energy materials (Fire, Ember, Spark, etc.) spread by nature
+        // - Energy materials (Fire, Ember, Spark, etc.) spread by nature (base + extension)
         // - Water (3), Ice (10): phase change spreading (freezing, condensation)
         // - Rust (77): corrosion spreading
         // - Moss (107), Algae (108): biological growth
@@ -59,7 +59,7 @@ mod tests {
             let mut s: HashSet<u16> = table
                 .materials
                 .iter()
-                .filter(|m| m.id >= defaults::ENERGY_START && m.id <= defaults::ENERGY_END)
+                .filter(|m| defaults::get_category(m.id) == "Energy")
                 .map(|m| m.id)
                 .collect();
             // Legacy energy
@@ -303,28 +303,19 @@ mod tests {
     fn test_category_coverage() {
         let (table, _) = load_all();
 
-        let categories = [
-            ("Naturals", defaults::NATURALS_START, defaults::NATURALS_END),
-            ("Metals", defaults::METALS_START, defaults::METALS_END),
-            ("Organics", defaults::ORGANICS_START, defaults::ORGANICS_END),
-            ("Energy", defaults::ENERGY_START, defaults::ENERGY_END),
-            (
-                "Synthetics",
-                defaults::SYNTHETICS_START,
-                defaults::SYNTHETICS_END,
-            ),
-            ("Exotic", defaults::EXOTIC_START, defaults::EXOTIC_END),
+        let expected_categories = [
+            "Naturals", "Metals", "Organics", "Energy", "Synthetics", "Exotic",
         ];
 
         let mut underfilled = Vec::new();
-        for (name, start, end) in &categories {
+        for &cat_name in &expected_categories {
             let count = table
                 .materials
                 .iter()
-                .filter(|m| m.id >= *start && m.id <= *end)
+                .filter(|m| defaults::get_category(m.id) == cat_name)
                 .count();
-            if count < 25 {
-                underfilled.push(format!("{}: {} materials (need >= 25)", name, count));
+            if count < 50 {
+                underfilled.push(format!("{}: {} materials (need >= 50)", cat_name, count));
             }
         }
 
@@ -398,6 +389,28 @@ mod tests {
             missing.is_empty(),
             "Categories with no interaction rules: {:?}",
             missing
+        );
+    }
+
+    /// Verify M14 threshold: at least 500 materials loaded.
+    #[test]
+    fn test_material_count_minimum() {
+        let (table, _) = load_all();
+        assert!(
+            table.len() >= 500,
+            "Expected >= 500 materials, found {}",
+            table.len()
+        );
+    }
+
+    /// Verify M14 threshold: at least 10,000 rules loaded.
+    #[test]
+    fn test_rule_count_minimum() {
+        let (_, rules) = load_all();
+        assert!(
+            rules.len() >= 10_000,
+            "Expected >= 10,000 rules, found {}",
+            rules.len()
         );
     }
 

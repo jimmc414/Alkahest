@@ -73,30 +73,20 @@ fn main() {
     let total_materials = table.len();
     let total_rules = rules.len();
 
-    // Count per category
-    let categories = [
-        ("Legacy", 0u16, 15u16),
-        ("Naturals", defaults::NATURALS_START, defaults::NATURALS_END),
-        ("Metals", defaults::METALS_START, defaults::METALS_END),
-        ("Organics", defaults::ORGANICS_START, defaults::ORGANICS_END),
-        ("Energy", defaults::ENERGY_START, defaults::ENERGY_END),
-        (
-            "Synthetics",
-            defaults::SYNTHETICS_START,
-            defaults::SYNTHETICS_END,
-        ),
-        ("Exotic", defaults::EXOTIC_START, defaults::EXOTIC_END),
+    // Count per category using get_category() which handles both base and extension ranges
+    let category_names = [
+        "Legacy", "Naturals", "Metals", "Organics", "Energy", "Synthetics", "Exotic",
     ];
 
     let mut cat_stats = String::from("[");
-    for (i, (name, start, end)) in categories.iter().enumerate() {
+    for (i, &name) in category_names.iter().enumerate() {
         if i > 0 {
             cat_stats.push(',');
         }
         let count = table
             .materials
             .iter()
-            .filter(|m| m.id >= *start && m.id <= *end)
+            .filter(|m| defaults::get_category(m.id) == name)
             .count();
         cat_stats.push_str(&format!(r#"{{"name":"{}","count":{}}}"#, name, count));
     }
