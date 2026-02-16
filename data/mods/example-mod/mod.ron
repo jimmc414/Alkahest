@@ -1,0 +1,7 @@
+(
+    name: "Crystal Pack",
+    version: "1.0.0",
+    author: "Alkahest Community",
+    description: "Adds crystal and gemstone materials with unique thermal and optical properties",
+    load_order_hint: 100,
+)
