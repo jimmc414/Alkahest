@@ -13,6 +13,8 @@ pub struct DebugPanel {
     chunk_total: u32,
     chunk_active: u32,
     chunk_static: u32,
+    degradation_level: u32,
+    render_scale: f32,
 }
 
 impl DebugPanel {
@@ -30,6 +32,8 @@ impl DebugPanel {
             chunk_total: 0,
             chunk_active: 0,
             chunk_static: 0,
+            degradation_level: 0,
+            render_scale: 1.0,
         }
     }
 
@@ -58,6 +62,12 @@ impl DebugPanel {
         self.chunk_total = total;
         self.chunk_active = active;
         self.chunk_static = static_count;
+    }
+
+    /// Update degradation level and render scale for display.
+    pub fn set_degradation(&mut self, level: u32, scale: f32) {
+        self.degradation_level = level;
+        self.render_scale = scale;
     }
 
     /// Render the debug panel using egui.
@@ -93,6 +103,17 @@ impl DebugPanel {
                     "Chunks: {} loaded | {} active | {} static",
                     self.chunk_total, self.chunk_active, self.chunk_static
                 ));
+                if self.degradation_level > 0 {
+                    ui.separator();
+                    let label = match self.degradation_level {
+                        1 => "DEGRADED: L1 (Sim 30Hz)".to_string(),
+                        2 => "DEGRADED: L2 (Sim 15Hz)".to_string(),
+                        3 => format!("DEGRADED: L3 (Render {:.0}%)", self.render_scale * 100.0),
+                        4 => "DEGRADED: L4 (LOD reduced)".to_string(),
+                        _ => format!("DEGRADED: L{}", self.degradation_level),
+                    };
+                    ui.colored_label(egui::Color32::YELLOW, label);
+                }
             });
     }
 }
