@@ -9,6 +9,7 @@ use crate::pick::PickBuffer;
 const MAX_DEBUG_VERTICES: u64 = 1024;
 
 /// GPU-uploadable camera uniforms. Must match CameraUniforms in ray_march.wgsl.
+/// 48 bytes total, aligned to 16 bytes for uniform buffer requirements.
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct CameraUniforms {
@@ -25,6 +26,9 @@ pub struct CameraUniforms {
     pub clip_position: u32,
     /// Packed cursor pixel: cursor_x | (cursor_y << 16).
     pub cursor_packed: u32,
+    /// LOD distance threshold in voxels. Beyond this distance, use coarser representation.
+    pub lod_threshold: f32,
+    pub _pad_lod: [f32; 3],
 }
 
 // LightConfig and LightManager are in crate::lighting
@@ -383,8 +387,8 @@ impl Renderer {
 
         let blit_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("blit-sampler"),
-            mag_filter: wgpu::FilterMode::Nearest,
-            min_filter: wgpu::FilterMode::Nearest,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
             ..Default::default()
         });
 

@@ -98,6 +98,16 @@ pub struct Application {
     trigger_load: bool,
     /// Shared slot for async file picker results.
     load_pending_data: Rc<RefCell<Option<Vec<u8>>>>,
+    /// Graceful degradation level: 0=none, 1=sim30Hz, 2=sim15Hz, 3=render75%, 4=LOD reduced.
+    degradation_level: u8,
+    /// EMA of frame time in ms for degradation decisions.
+    degrade_avg_ms: f64,
+    /// Frames since last degradation level change (hysteresis cooldown).
+    degrade_cooldown: u32,
+    /// Total frame counter for sim-skip modulo logic.
+    frame_counter: u64,
+    /// Current render scale factor (1.0 or 0.75).
+    render_scale: f32,
 }
 
 impl Application {
@@ -221,6 +231,11 @@ impl Application {
             trigger_save: false,
             trigger_load: false,
             load_pending_data: Rc::new(RefCell::new(None)),
+            degradation_level: 0,
+            degrade_avg_ms: 16.0,
+            degrade_cooldown: 0,
+            frame_counter: 0,
+            render_scale: 1.0,
         }
     }
 
@@ -797,8 +812,69 @@ impl Application {
         }
     }
 
+    /// Update graceful degradation state machine (ARCH 15.4).
+    /// EMA > 20ms for 60+ frames → escalate; EMA < 14ms for 60+ frames → de-escalate.
+    fn update_degradation(&mut self) {
+        // EMA with alpha ~0.05 (smoothed over ~20 frames)
+        self.degrade_avg_ms = self.degrade_avg_ms * 0.95 + self.frame_delta_ms * 0.05;
+        self.frame_counter += 1;
+
+        if self.degrade_cooldown > 0 {
+            self.degrade_cooldown -= 1;
+            return;
+        }
+
+        let width = self.gpu.surface_config.width;
+        let height = self.gpu.surface_config.height;
+
+        if self.degrade_avg_ms > 20.0 && self.degradation_level < 4 {
+            let prev_level = self.degradation_level;
+            self.degradation_level += 1;
+            self.degrade_cooldown = 60;
+            log::info!(
+                "Degradation escalated: level {} → {} (avg {:.1}ms)",
+                prev_level,
+                self.degradation_level,
+                self.degrade_avg_ms
+            );
+            // On transition to level 3: reduce render resolution
+            if self.degradation_level == 3 {
+                self.render_scale = 0.75;
+                let rw = ((width as f32) * 0.75) as u32;
+                let rh = ((height as f32) * 0.75) as u32;
+                self.renderer.resize(&self.gpu.device, rw, rh);
+            }
+        } else if self.degrade_avg_ms < 14.0 && self.degradation_level > 0 {
+            let prev_level = self.degradation_level;
+            // On transition from level 3 to 2: restore full render resolution
+            if self.degradation_level == 3 {
+                self.render_scale = 1.0;
+                self.renderer.resize(&self.gpu.device, width, height);
+            }
+            self.degradation_level -= 1;
+            self.degrade_cooldown = 60;
+            log::info!(
+                "Degradation de-escalated: level {} → {} (avg {:.1}ms)",
+                prev_level,
+                self.degradation_level,
+                self.degrade_avg_ms
+            );
+        }
+    }
+
+    /// Check whether simulation should be skipped this frame based on degradation level.
+    fn should_skip_sim(&self) -> bool {
+        match self.degradation_level {
+            1 => !self.frame_counter.is_multiple_of(2), // sim 30Hz: skip odd frames
+            2..=4 => !self.frame_counter.is_multiple_of(4), // sim 15Hz: run every 4th frame
+            _ => false,
+        }
+    }
+
     /// Render a single frame.
     fn render_frame(&mut self) {
+        // Update degradation state machine before doing work
+        self.update_degradation();
         // Check for pending load data from async file picker
         if let Some(bytes) = self.load_pending_data.borrow_mut().take() {
             self.save_state = SaveState::LoadPending { bytes };
@@ -830,6 +906,9 @@ impl Application {
             }
         }
 
+        // Cache sim-skip decision before destructuring self
+        let skip_sim = self.should_skip_sim();
+
         // Destructure self for disjoint field borrows
         let Application {
             gpu,
@@ -858,6 +937,8 @@ impl Application {
             rule_mismatch_warning,
             trigger_save,
             trigger_load,
+            degradation_level,
+            render_scale,
             ..
         } = self;
 
@@ -1201,6 +1282,12 @@ impl Application {
             let input = input_state.borrow();
             input.mouse_y as u32
         };
+        // LOD threshold: at degradation level 4, reduce to half distance for coarser LOD
+        let lod_thresh = if *degradation_level >= 4 {
+            LOD_DISTANCE_THRESHOLD * 0.5
+        } else {
+            LOD_DISTANCE_THRESHOLD
+        };
         let cam_uniforms = camera.to_uniforms(
             width,
             height,
@@ -1209,6 +1296,7 @@ impl Application {
             *clip_position,
             cursor_x,
             cursor_y,
+            lod_thresh,
         );
         renderer.update_camera(&gpu.queue, cam_uniforms);
         renderer.update_lights(&gpu.queue);
@@ -1223,6 +1311,7 @@ impl Application {
         debug_panel.set_sim_info(sim.tick_count(), sim.is_paused());
         let (total, active, static_count) = world.chunk_counts();
         debug_panel.set_chunk_info(total, active, static_count);
+        debug_panel.set_degradation(*degradation_level as u32, *render_scale);
 
         // 4. Get surface texture, handle Lost by reconfiguring
         let output = match gpu.surface.get_current_texture() {
@@ -1299,21 +1388,29 @@ impl Application {
         //    Tick accumulator: sim_speed controls how many ticks per second.
         //    At 60fps: 0.25x → ~15 ticks/sec, 1x → ~60, 4x → ~240.
         //    Cap at 4 ticks per frame to prevent frame-time explosion.
+        //    Degradation: when skip_sim is true, skip sim ticks but still render.
         let delta_sec = *frame_delta_ms / 1000.0;
         *tick_accumulator += delta_sec * (*sim_speed as f64) * 60.0;
         let mut ticks_this_frame = 0u32;
-        while *tick_accumulator >= 1.0 && ticks_this_frame < 4 {
-            sim.upload_chunk_descriptors(&gpu.queue, &descriptor_data);
-            sim.upload_commands(&gpu.queue);
-            sim.tick(
-                &gpu.device,
-                &gpu.queue,
-                &mut encoder,
-                active_chunk_count,
-                &active_slots,
-            );
-            *tick_accumulator -= 1.0;
-            ticks_this_frame += 1;
+        if !skip_sim {
+            while *tick_accumulator >= 1.0 && ticks_this_frame < 4 {
+                sim.upload_chunk_descriptors(&gpu.queue, &descriptor_data);
+                sim.upload_commands(&gpu.queue);
+                sim.tick(
+                    &gpu.device,
+                    &gpu.queue,
+                    &mut encoder,
+                    active_chunk_count,
+                    &active_slots,
+                );
+                *tick_accumulator -= 1.0;
+                ticks_this_frame += 1;
+            }
+        } else {
+            // Drain accumulator without ticking to prevent frame-burst on recovery
+            while *tick_accumulator >= 1.0 {
+                *tick_accumulator -= 1.0;
+            }
         }
         // Ensure at least descriptor upload even if no ticks ran
         if ticks_this_frame == 0 {
