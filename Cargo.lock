@@ -40,6 +40,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "alkahest-audio"
+version = "0.1.0"
+dependencies = [
+ "alkahest-core",
+ "glam",
+ "js-sys",
+ "log",
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
 name = "alkahest-bench"
 version = "0.1.0"
 dependencies = [
@@ -119,6 +131,7 @@ dependencies = [
 name = "alkahest-web"
 version = "0.1.0"
 dependencies = [
+ "alkahest-audio",
  "alkahest-core",
  "alkahest-persist",
  "alkahest-render",

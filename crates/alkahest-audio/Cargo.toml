@@ -1,0 +1,27 @@
+[package]
+name = "alkahest-audio"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+alkahest-core = { path = "../alkahest-core" }
+glam = { workspace = true }
+log = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+web-sys = { workspace = true, features = [
+    "AudioContext",
+    "AudioContextState",
+    "GainNode",
+    "OscillatorNode",
+    "OscillatorType",
+    "AudioBuffer",
+    "AudioBufferSourceNode",
+    "BiquadFilterNode",
+    "BiquadFilterType",
+    "AudioDestinationNode",
+    "AudioParam",
+    "AudioNode",
+] }
+wasm-bindgen = { workspace = true }
+js-sys = { workspace = true }

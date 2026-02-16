@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/alkahest-audio",
     "crates/alkahest-bench",
     "crates/alkahest-core",
     "crates/alkahest-persist",
