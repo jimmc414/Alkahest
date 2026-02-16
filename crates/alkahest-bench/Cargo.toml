@@ -1,0 +1,23 @@
+[package]
+name = "alkahest-bench"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "bench-runner"
+path = "src/main.rs"
+
+[dependencies]
+alkahest-core = { path = "../alkahest-core" }
+alkahest-sim = { path = "../alkahest-sim" }
+alkahest-rules = { path = "../alkahest-rules" }
+alkahest-world = { path = "../alkahest-world" }
+alkahest-render = { path = "../alkahest-render" }
+wgpu = { workspace = true }
+glam = { workspace = true }
+bytemuck = { workspace = true }
+log = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+env_logger = "0.11"
+pollster = "0.4"
