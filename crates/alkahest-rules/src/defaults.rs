@@ -19,6 +19,9 @@ pub const SYNTHETICS_END: u16 = 209;
 pub const EXOTIC_START: u16 = 210;
 pub const EXOTIC_END: u16 = 249;
 
+/// First valid material ID for mod-defined materials.
+pub const MOD_ID_START: u16 = 10000;
+
 /// Return the category name for a given material ID.
 pub fn get_category(id: u16) -> &'static str {
     match id {
@@ -30,7 +33,8 @@ pub fn get_category(id: u16) -> &'static str {
         ENERGY_START..=ENERGY_END => "Energy",
         SYNTHETICS_START..=SYNTHETICS_END => "Synthetics",
         EXOTIC_START..=EXOTIC_END => "Exotic",
-        _ => "Unknown",
+        250..=9999 => "Reserved",
+        MOD_ID_START.. => "Mod",
     }
 }
 
@@ -55,6 +59,10 @@ mod tests {
         assert_eq!(get_category(209), "Synthetics");
         assert_eq!(get_category(210), "Exotic");
         assert_eq!(get_category(249), "Exotic");
-        assert_eq!(get_category(255), "Unknown");
+        assert_eq!(get_category(255), "Reserved");
+        assert_eq!(get_category(9999), "Reserved");
+        assert_eq!(get_category(10000), "Mod");
+        assert_eq!(get_category(10001), "Mod");
+        assert_eq!(get_category(u16::MAX), "Mod");
     }
 }
