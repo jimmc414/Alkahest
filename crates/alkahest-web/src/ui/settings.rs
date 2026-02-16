@@ -14,6 +14,8 @@ pub fn show(
     trigger_save: &mut bool,
     trigger_load: &mut bool,
     save_idle: bool,
+    audio_enabled: &mut bool,
+    audio_volume: &mut f32,
 ) {
     egui::Window::new("Settings")
         .anchor(egui::Align2::LEFT_TOP, egui::vec2(8.0, 250.0))
@@ -98,6 +100,17 @@ pub fn show(
             });
 
             ui.checkbox(auto_save_enabled, "Auto-save (5 min)");
+
+            ui.separator();
+
+            // Audio section
+            ui.label("Audio");
+            ui.checkbox(audio_enabled, "Enable Audio");
+            if *audio_enabled {
+                ui.add(egui::Slider::new(audio_volume, 0.0..=1.0).text("Volume"));
+            }
+
+            ui.separator();
 
             // Status indicator
             match save_status {

@@ -108,6 +108,12 @@ pub struct Application {
     frame_counter: u64,
     /// Current render scale factor (1.0 or 0.75).
     render_scale: f32,
+    /// Audio system (optional, user-toggled).
+    audio_system: alkahest_audio::AudioSystem,
+    /// Whether audio is enabled (UI toggle state).
+    audio_enabled: bool,
+    /// Master audio volume (0.0-1.0).
+    audio_volume: f32,
 }
 
 impl Application {
@@ -236,6 +242,9 @@ impl Application {
             degrade_cooldown: 0,
             frame_counter: 0,
             render_scale: 1.0,
+            audio_system: alkahest_audio::AudioSystem::new(),
+            audio_enabled: false,
+            audio_volume: 0.7,
         }
     }
 
@@ -988,6 +997,9 @@ impl Application {
             trigger_load,
             degradation_level,
             render_scale,
+            audio_system,
+            audio_enabled,
+            audio_volume,
             ..
         } = self;
 
@@ -1245,6 +1257,15 @@ impl Application {
                             );
                         }
                     }
+                    // Register audio event for placed material
+                    if !input.shift_down {
+                        if let Some(cat) = alkahest_audio::AudioCategory::from_material_id(
+                            tool_state.place_material,
+                        ) {
+                            let pos = glam::Vec3::new(wx as f32, wy as f32, wz as f32);
+                            audio_system.register_event(pos, cat, 1.0);
+                        }
+                    }
                 }
 
                 // H key: heat tool with brush
@@ -1269,6 +1290,9 @@ impl Application {
                             bs,
                         );
                     }
+                    // Heat tool may produce steam
+                    let pos = glam::Vec3::new(target.x, target.y + 1.0, target.z);
+                    audio_system.register_event(pos, alkahest_audio::AudioCategory::Steam, 0.6);
                 }
 
                 // F key: freeze tool with brush
@@ -1381,6 +1405,18 @@ impl Application {
 
         let surface_view = output.texture.create_view(&Default::default());
 
+        // 4b. Audio system update
+        if *audio_enabled != audio_system.is_enabled() {
+            audio_system.set_enabled(*audio_enabled);
+        }
+        audio_system.set_volume(*audio_volume);
+        {
+            let (_, active, _) = world.chunk_counts();
+            let eye = camera.eye_position();
+            let fwd = (camera.target - eye).normalize_or_zero();
+            audio_system.update(*frame_delta_ms as f32 / 1000.0, eye, fwd, active);
+        }
+
         // 5. Run egui frame (before GPU encoding)
         let screen = ui_state.screen_descriptor(width, height);
 
@@ -1418,6 +1454,8 @@ impl Application {
                 trigger_save,
                 trigger_load,
                 save_idle,
+                audio_enabled,
+                audio_volume,
             );
             crate::ui::help::show(ctx, help_open);
         });

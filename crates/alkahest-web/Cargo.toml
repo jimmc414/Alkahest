@@ -7,6 +7,7 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+alkahest-audio = { path = "../alkahest-audio" }
 alkahest-core = { path = "../alkahest-core" }
 alkahest-persist = { path = "../alkahest-persist" }
 alkahest-render = { path = "../alkahest-render" }
