@@ -34,7 +34,7 @@ pub const BYTES_PER_CHUNK: u32 = VOXELS_PER_CHUNK * VOXEL_BYTES;
 
 /// Maximum number of materials supported by the rule engine.
 /// Used to size the interaction lookup table (MAX_RULE_MATERIALS^2 entries).
-pub const MAX_RULE_MATERIALS: u32 = 256;
+pub const MAX_RULE_MATERIALS: u32 = 1024;
 
 /// Sentinel value in the rule lookup buffer: no rule exists for this pair.
 pub const NO_RULE: u32 = 0xFFFFFFFF;
