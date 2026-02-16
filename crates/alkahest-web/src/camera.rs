@@ -161,6 +161,7 @@ impl Camera {
         clip_position: f32,
         cursor_x: u32,
         cursor_y: u32,
+        lod_threshold: f32,
     ) -> CameraUniforms {
         let w = width as f32;
         let h = height as f32;
@@ -178,6 +179,8 @@ impl Camera {
             clip_axis,
             clip_position: clip_position.to_bits(),
             cursor_packed: cursor_x | (cursor_y << 16),
+            lod_threshold,
+            _pad_lod: [0.0; 3],
         }
     }
 }

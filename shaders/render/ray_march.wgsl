@@ -27,6 +27,8 @@ struct CameraUniforms {
     clip_axis: u32,
     clip_position: u32,
     cursor_packed: u32,
+    lod_threshold: f32,
+    _pad_lod: vec3<f32>,
 }
 
 struct LightConfig {
