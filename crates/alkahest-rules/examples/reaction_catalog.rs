@@ -75,7 +75,13 @@ fn main() {
 
     // Count per category using get_category() which handles both base and extension ranges
     let category_names = [
-        "Legacy", "Naturals", "Metals", "Organics", "Energy", "Synthetics", "Exotic",
+        "Legacy",
+        "Naturals",
+        "Metals",
+        "Organics",
+        "Energy",
+        "Synthetics",
+        "Exotic",
     ];
 
     let mut cat_stats = String::from("[");

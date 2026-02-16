@@ -304,7 +304,12 @@ mod tests {
         let (table, _) = load_all();
 
         let expected_categories = [
-            "Naturals", "Metals", "Organics", "Energy", "Synthetics", "Exotic",
+            "Naturals",
+            "Metals",
+            "Organics",
+            "Energy",
+            "Synthetics",
+            "Exotic",
         ];
 
         let mut underfilled = Vec::new();
