@@ -1,7 +1,12 @@
-use alkahest_core::constants::{BYTES_PER_CHUNK, MAX_CHUNK_SLOTS};
+use alkahest_core::constants::{BYTES_PER_CHUNK, MAX_CHUNK_SLOTS, VOXELS_PER_CHUNK};
 
 /// Total byte size of one chunk's voxel data (32^3 * 8 bytes = 256 KB).
 pub const CHUNK_BUFFER_SIZE: u64 = BYTES_PER_CHUNK as u64;
+
+/// Total byte size of one chunk's charge data (32^3 * 4 bytes = 128 KB).
+/// Each voxel stores 1 u32 for charge (only low 8 bits used, but u32 avoids
+/// WGSL alignment issues and cross-thread write conflicts in packed bytes).
+pub const CHARGE_SLOT_SIZE: u64 = VOXELS_PER_CHUNK as u64 * 4;
 
 /// Double-buffered chunk pool for multi-chunk simulation (C-SIM-1).
 ///
@@ -9,15 +14,21 @@ pub const CHUNK_BUFFER_SIZE: u64 = BYTES_PER_CHUNK as u64;
 /// the other is read-write (next state). Each pool is divided into fixed-size 256 KB slots,
 /// one per loaded chunk. After all passes complete, `swap()` flips the pool roles.
 ///
+/// Additionally, two charge pool buffers store per-voxel electrical charge (M15).
+/// Charge pools follow the same double-buffering and slot layout.
+///
 /// Pool capacity is determined by `min(device.maxBufferSize / CHUNK_BUFFER_SIZE, MAX_CHUNK_SLOTS)`.
 pub struct ChunkPool {
     pools: [wgpu::Buffer; 2],
+    charge_pools: [wgpu::Buffer; 2],
     /// 0 or 1: index of the pool currently used for reading.
     read_index: u32,
     /// Number of slots available in each pool.
     slot_count: u32,
     /// Total byte size of each pool buffer.
     pool_byte_size: u64,
+    /// Total byte size of each charge pool buffer.
+    charge_pool_byte_size: u64,
 }
 
 impl ChunkPool {
@@ -36,10 +47,12 @@ impl ChunkPool {
         }
 
         let pool_byte_size = slot_count as u64 * CHUNK_BUFFER_SIZE;
+        let charge_pool_byte_size = slot_count as u64 * CHARGE_SLOT_SIZE;
         log::info!(
-            "ChunkPool: {} slots, {} MB per pool",
+            "ChunkPool: {} slots, {} MB per pool, {} MB per charge pool",
             slot_count,
-            pool_byte_size / (1024 * 1024)
+            pool_byte_size / (1024 * 1024),
+            charge_pool_byte_size / (1024 * 1024),
         );
 
         let usage = wgpu::BufferUsages::STORAGE
@@ -60,11 +73,27 @@ impl ChunkPool {
             mapped_at_creation: false,
         });
 
+        let charge_a = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("charge-pool-a"),
+            size: charge_pool_byte_size,
+            usage,
+            mapped_at_creation: false,
+        });
+
+        let charge_b = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("charge-pool-b"),
+            size: charge_pool_byte_size,
+            usage,
+            mapped_at_creation: false,
+        });
+
         Self {
             pools: [pool_a, pool_b],
+            charge_pools: [charge_a, charge_b],
             read_index: 0,
             slot_count,
             pool_byte_size,
+            charge_pool_byte_size,
         }
     }
 
@@ -76,6 +105,16 @@ impl ChunkPool {
     /// The pool buffer used for writing this tick.
     pub fn write_pool(&self) -> &wgpu::Buffer {
         &self.pools[1 - self.read_index as usize]
+    }
+
+    /// The charge pool buffer used for reading this tick.
+    pub fn charge_read_pool(&self) -> &wgpu::Buffer {
+        &self.charge_pools[self.read_index as usize]
+    }
+
+    /// The charge pool buffer used for writing this tick.
+    pub fn charge_write_pool(&self) -> &wgpu::Buffer {
+        &self.charge_pools[1 - self.read_index as usize]
     }
 
     /// Swap read/write pool roles. Call after all passes complete.
@@ -98,9 +137,19 @@ impl ChunkPool {
         self.pool_byte_size
     }
 
+    /// Total byte size of each charge pool buffer.
+    pub fn charge_pool_byte_size(&self) -> u64 {
+        self.charge_pool_byte_size
+    }
+
     /// Byte offset of a given slot within a pool buffer.
     pub fn slot_byte_offset(slot: u32) -> u64 {
         slot as u64 * CHUNK_BUFFER_SIZE
+    }
+
+    /// Byte offset of a given slot within a charge pool buffer.
+    pub fn charge_slot_byte_offset(slot: u32) -> u64 {
+        slot as u64 * CHARGE_SLOT_SIZE
     }
 
     /// Upload voxel data for one chunk slot to the write pool.
@@ -129,6 +178,18 @@ impl ChunkPool {
             CHUNK_BUFFER_SIZE,
         );
     }
+
+    /// Copy one charge slot from read to write (pre-pass copy for electrical simulation).
+    pub fn copy_charge_slot_read_to_write(&self, encoder: &mut wgpu::CommandEncoder, slot: u32) {
+        let byte_offset = Self::charge_slot_byte_offset(slot);
+        encoder.copy_buffer_to_buffer(
+            self.charge_read_pool(),
+            byte_offset,
+            self.charge_write_pool(),
+            byte_offset,
+            CHARGE_SLOT_SIZE,
+        );
+    }
 }
 
 #[cfg(test)]
@@ -142,9 +203,22 @@ mod tests {
     }
 
     #[test]
+    fn test_charge_slot_size() {
+        // 32^3 voxels * 1 u32 * 4 bytes = 131072 bytes = 128 KB
+        assert_eq!(CHARGE_SLOT_SIZE, 131_072);
+    }
+
+    #[test]
     fn test_slot_byte_offset() {
         assert_eq!(ChunkPool::slot_byte_offset(0), 0);
         assert_eq!(ChunkPool::slot_byte_offset(1), 262_144);
         assert_eq!(ChunkPool::slot_byte_offset(2), 524_288);
+    }
+
+    #[test]
+    fn test_charge_slot_byte_offset() {
+        assert_eq!(ChunkPool::charge_slot_byte_offset(0), 0);
+        assert_eq!(ChunkPool::charge_slot_byte_offset(1), 131_072);
+        assert_eq!(ChunkPool::charge_slot_byte_offset(2), 262_144);
     }
 }

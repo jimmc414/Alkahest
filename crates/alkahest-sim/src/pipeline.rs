@@ -6,9 +6,9 @@ use crate::buffers::ChunkPool;
 use crate::conflict::{build_movement_schedule, MovementUniforms, SubPass};
 pub use crate::passes::commands::SimCommand;
 use crate::passes::commands::{self, SimParams, MAX_COMMANDS};
+use crate::passes::electrical;
 use crate::passes::movement;
 use crate::passes::pressure;
-use crate::passes::reactions;
 use crate::passes::thermal;
 
 /// GPU debug buffer size (C-GPU-10).
@@ -36,6 +36,7 @@ pub struct TickTimings {
     pub movement_ms: f64,
     pub reactions_ms: f64,
     pub thermal_ms: f64,
+    pub electrical_ms: f64,
     pub pressure_ms: f64,
     pub activity_ms: f64,
     pub total_ms: f64,
@@ -59,6 +60,9 @@ pub struct SimPipeline {
     movement_pipeline: wgpu::ComputePipeline,
     reaction_pipeline: wgpu::ComputePipeline,
     thermal_pipeline: wgpu::ComputePipeline,
+    electrical_pipeline: wgpu::ComputePipeline,
+    electrical_bind_group_layout: wgpu::BindGroupLayout,
+    charge_bind_group_layout: wgpu::BindGroupLayout,
     pressure_pipeline: wgpu::ComputePipeline,
     activity_pipeline: wgpu::ComputePipeline,
     activity_bind_group_layout: wgpu::BindGroupLayout,
@@ -300,6 +304,12 @@ impl SimPipeline {
                 ],
             });
 
+        // Electrical bind group layout (separate, 7 bindings — M15)
+        let electrical_bind_group_layout = electrical::create_electrical_bind_group_layout(device);
+
+        // Charge read bind group layout for reactions @group(1) (M15)
+        let charge_bind_group_layout = electrical::create_charge_bind_group_layout(device);
+
         // Compose shader sources
         let constants_preamble = format!(
             "const CHUNK_SIZE: u32 = {}u;\nconst VOXELS_PER_CHUNK: u32 = {}u;\n\
@@ -315,7 +325,11 @@ impl SimPipeline {
              const WORLD_CHUNKS_Z: u32 = {}u;\n\
              const PRESSURE_DIFFUSION_RATE: f32 = {:.6};\n\
              const MAX_PRESSURE: u32 = {}u;\n\
-             const THERMAL_PRESSURE_FACTOR: u32 = {}u;\n",
+             const THERMAL_PRESSURE_FACTOR: u32 = {}u;\n\
+             const ELECTRICAL_DIFFUSION_RATE: f32 = {:.6};\n\
+             const CHARGE_MAX: u32 = {}u;\n\
+             const CHARGE_DECAY_RATE: u32 = {}u;\n\
+             const JOULE_HEATING_FACTOR: f32 = {:.6};\n",
             CHUNK_SIZE,
             VOXELS_PER_CHUNK,
             alkahest_core::constants::DIFFUSION_RATE,
@@ -331,6 +345,10 @@ impl SimPipeline {
             alkahest_core::constants::PRESSURE_DIFFUSION_RATE,
             alkahest_core::constants::MAX_PRESSURE,
             alkahest_core::constants::THERMAL_PRESSURE_FACTOR,
+            alkahest_core::constants::ELECTRICAL_DIFFUSION_RATE,
+            alkahest_core::constants::CHARGE_MAX,
+            alkahest_core::constants::CHARGE_DECAY_RATE,
+            alkahest_core::constants::JOULE_HEATING_FACTOR,
         );
         let types_wgsl = include_str!("../../../shaders/common/types.wgsl");
         let coords_wgsl = include_str!("../../../shaders/common/coords.wgsl");
@@ -339,6 +357,7 @@ impl SimPipeline {
         let movement_wgsl = include_str!("../../../shaders/sim/movement.wgsl");
         let reactions_wgsl = include_str!("../../../shaders/sim/reactions.wgsl");
         let thermal_wgsl = include_str!("../../../shaders/sim/thermal.wgsl");
+        let electrical_wgsl = include_str!("../../../shaders/sim/electrical.wgsl");
         let pressure_wgsl = include_str!("../../../shaders/sim/pressure.wgsl");
         let activity_wgsl = include_str!("../../../shaders/sim/activity.wgsl");
 
@@ -354,6 +373,9 @@ impl SimPipeline {
         let thermal_shader_source = format!(
             "{constants_preamble}\n{types_wgsl}\n{coords_wgsl}\n{rng_wgsl}\n{thermal_wgsl}"
         );
+        let electrical_shader_source = format!(
+            "{constants_preamble}\n{types_wgsl}\n{coords_wgsl}\n{rng_wgsl}\n{electrical_wgsl}"
+        );
         let pressure_shader_source = format!(
             "{constants_preamble}\n{types_wgsl}\n{coords_wgsl}\n{rng_wgsl}\n{pressure_wgsl}"
         );
@@ -363,13 +385,19 @@ impl SimPipeline {
             commands::create_command_pipeline(device, &bind_group_layout, &command_shader_source);
         let movement_pipeline =
             movement::create_movement_pipeline(device, &bind_group_layout, &movement_shader_source);
-        let reaction_pipeline = reactions::create_reaction_pipeline(
+        let reaction_pipeline = electrical::create_charge_reaction_pipeline(
             device,
             &bind_group_layout,
+            &charge_bind_group_layout,
             &reactions_shader_source,
         );
         let thermal_pipeline =
             thermal::create_thermal_pipeline(device, &bind_group_layout, &thermal_shader_source);
+        let electrical_pipeline = electrical::create_electrical_pipeline(
+            device,
+            &electrical_bind_group_layout,
+            &electrical_shader_source,
+        );
         let pressure_pipeline =
             pressure::create_pressure_pipeline(device, &bind_group_layout, &pressure_shader_source);
         let activity_pipeline = crate::passes::activity::create_activity_pipeline(
@@ -394,6 +422,9 @@ impl SimPipeline {
             movement_pipeline,
             reaction_pipeline,
             thermal_pipeline,
+            electrical_pipeline,
+            electrical_bind_group_layout,
+            charge_bind_group_layout,
             pressure_pipeline,
             activity_pipeline,
             activity_bind_group_layout,
@@ -449,6 +480,56 @@ impl SimPipeline {
         }
     }
 
+    /// Create the charge read bind group for reactions @group(1).
+    fn create_charge_read_bind_group(&self, device: &wgpu::Device) -> wgpu::BindGroup {
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("charge-read-bind-group"),
+            layout: &self.charge_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: self.chunk_pool.charge_read_pool().as_entire_binding(),
+            }],
+        })
+    }
+
+    /// Create the electrical bind group for the electrical propagation pass.
+    fn create_electrical_bind_group(&self, device: &wgpu::Device) -> wgpu::BindGroup {
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("electrical-bind-group"),
+            layout: &self.electrical_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: self.chunk_pool.read_pool().as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: self.chunk_pool.write_pool().as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: self.material_props_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: self.chunk_pool.charge_read_pool().as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: self.chunk_pool.charge_write_pool().as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 5,
+                    resource: self.uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 6,
+                    resource: self.chunk_desc_buffer.as_entire_binding(),
+                },
+            ],
+        })
+    }
+
     /// Run one simulation tick over all active chunks.
     ///
     /// `active_slots` is the list of pool slot indices for active chunks.
@@ -478,6 +559,8 @@ impl SimPipeline {
         // Copy read pool → write pool for each active chunk slot
         for &slot in active_slots {
             self.chunk_pool.copy_slot_read_to_write(encoder, slot);
+            self.chunk_pool
+                .copy_charge_slot_read_to_write(encoder, slot);
         }
 
         // Create bind group for this tick (references current read/write pools)
@@ -519,6 +602,9 @@ impl SimPipeline {
                 },
             ],
         });
+
+        // Charge read bind group for reactions @group(1) (M15)
+        let charge_bind_group = self.create_charge_read_bind_group(device);
 
         // Pass 1: Apply player commands
         if command_count > 0 {
@@ -564,7 +650,7 @@ impl SimPipeline {
             );
         }
 
-        // Pass 3: Reactions (batched)
+        // Pass 3: Reactions with charge conditions (batched)
         {
             let uniforms = ReactionUniforms {
                 tick: self.tick_count as u32,
@@ -582,15 +668,16 @@ impl SimPipeline {
                 label: Some("sim-reactions-pass"),
                 timestamp_writes: None,
             });
-            reactions::dispatch_reactions(
+            electrical::dispatch_reactions_with_charge(
                 &mut pass,
                 &self.reaction_pipeline,
                 &bind_group,
+                &charge_bind_group,
                 active_chunk_count,
             );
         }
 
-        // Pass 4: Thermal diffusion (batched)
+        // Pass 4a: Thermal diffusion (batched)
         {
             let uniforms = ReactionUniforms {
                 tick: self.tick_count as u32,
@@ -612,6 +699,34 @@ impl SimPipeline {
                 &mut pass,
                 &self.thermal_pipeline,
                 &bind_group,
+                active_chunk_count,
+            );
+        }
+
+        // Pass 4b: Electrical charge propagation (M15)
+        {
+            let uniforms = ReactionUniforms {
+                tick: self.tick_count as u32,
+                material_count: self.material_count,
+                _pad0: 0,
+                _pad1: 0,
+                _pad2: 0,
+                _pad3: 0,
+                _pad4: 0,
+                _pad5: 0,
+            };
+            queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
+
+            let electrical_bind_group = self.create_electrical_bind_group(device);
+
+            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("sim-electrical-pass"),
+                timestamp_writes: None,
+            });
+            electrical::dispatch_electrical(
+                &mut pass,
+                &self.electrical_pipeline,
+                &electrical_bind_group,
                 active_chunk_count,
             );
         }
@@ -751,6 +866,8 @@ impl SimPipeline {
             });
             for &slot in active_slots {
                 self.chunk_pool.copy_slot_read_to_write(&mut encoder, slot);
+                self.chunk_pool
+                    .copy_charge_slot_read_to_write(&mut encoder, slot);
             }
             queue.submit(std::iter::once(encoder.finish()));
             device.poll(wgpu::Maintain::Wait);
@@ -795,6 +912,9 @@ impl SimPipeline {
                 },
             ],
         });
+
+        // Charge read bind group for reactions @group(1)
+        let charge_bind_group = self.create_charge_read_bind_group(device);
 
         let mut timings = TickTimings::default();
 
@@ -862,7 +982,7 @@ impl SimPipeline {
             timings.movement_ms = start.elapsed().as_secs_f64() * 1000.0;
         }
 
-        // Pass 3: Reactions
+        // Pass 3: Reactions with charge conditions
         {
             let start = Instant::now();
             let uniforms = ReactionUniforms {
@@ -884,10 +1004,11 @@ impl SimPipeline {
                 label: Some("instrumented-reactions-pass"),
                 timestamp_writes: None,
             });
-            reactions::dispatch_reactions(
+            electrical::dispatch_reactions_with_charge(
                 &mut pass,
                 &self.reaction_pipeline,
                 &bind_group,
+                &charge_bind_group,
                 active_chunk_count,
             );
             drop(pass);
@@ -896,7 +1017,7 @@ impl SimPipeline {
             timings.reactions_ms = start.elapsed().as_secs_f64() * 1000.0;
         }
 
-        // Pass 4: Thermal
+        // Pass 4a: Thermal
         {
             let start = Instant::now();
             let uniforms = ReactionUniforms {
@@ -928,6 +1049,42 @@ impl SimPipeline {
             queue.submit(std::iter::once(encoder.finish()));
             device.poll(wgpu::Maintain::Wait);
             timings.thermal_ms = start.elapsed().as_secs_f64() * 1000.0;
+        }
+
+        // Pass 4b: Electrical
+        {
+            let start = Instant::now();
+            let uniforms = ReactionUniforms {
+                tick: self.tick_count as u32,
+                material_count: self.material_count,
+                _pad0: 0,
+                _pad1: 0,
+                _pad2: 0,
+                _pad3: 0,
+                _pad4: 0,
+                _pad5: 0,
+            };
+            queue.write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
+
+            let electrical_bind_group = self.create_electrical_bind_group(device);
+
+            let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("instrumented-electrical"),
+            });
+            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("instrumented-electrical-pass"),
+                timestamp_writes: None,
+            });
+            electrical::dispatch_electrical(
+                &mut pass,
+                &self.electrical_pipeline,
+                &electrical_bind_group,
+                active_chunk_count,
+            );
+            drop(pass);
+            queue.submit(std::iter::once(encoder.finish()));
+            device.poll(wgpu::Maintain::Wait);
+            timings.electrical_ms = start.elapsed().as_secs_f64() * 1000.0;
         }
 
         // Pass 5: Pressure
@@ -1090,6 +1247,11 @@ impl SimPipeline {
     /// Get the read pool buffer (for renderer to sample from).
     pub fn get_read_pool(&self) -> &wgpu::Buffer {
         self.chunk_pool.read_pool()
+    }
+
+    /// Get the charge read pool buffer (for renderer to read charge values).
+    pub fn get_charge_read_pool(&self) -> &wgpu::Buffer {
+        self.chunk_pool.charge_read_pool()
     }
 
     /// Get the chunk descriptor buffer (for renderer).
