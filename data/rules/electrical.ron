@@ -1,0 +1,884 @@
+[
+    // =========================================================================
+    // ELECTRICAL INTERACTION RULES (M15)
+    // Charge-gated rules for Toggle-ite state changes, short circuits,
+    // fuse blowing, electrolysis, and electrical effects on materials.
+    //
+    // Material IDs:
+    //   550=Copper Wire, 551=Resistor Paste, 552=Insulator Coat,
+    //   553=Signal Sand, 554=Toggle-ite Off, 555=Toggle-ite On,
+    //   556=Power Source, 557=Ground, 558=LED Crystal, 559=Fuse Wire
+    //   0=Air, 3=Water, 5=Fire, 6=Smoke, 7=Steam, 9=Ash,
+    //   131=Spark, 132=Ember, 72=Molten Copper
+    // =========================================================================
+
+    // ─── Toggle-ite State Changes ────────────────────────────────────────
+    // Toggle-ite Off + conductor → Toggle-ite On + conductor (when charged)
+
+    (
+        name: "Toggle Off+Wire activates",
+        input_a: 554,
+        input_b: 550,
+        output_a: 555,
+        output_b: 550,
+        probability: 0.8,
+        min_charge: 100,
+    ),
+    (
+        name: "Toggle Off+Resistor activates",
+        input_a: 554,
+        input_b: 551,
+        output_a: 555,
+        output_b: 551,
+        probability: 0.8,
+        min_charge: 100,
+    ),
+    (
+        name: "Toggle Off+Signal Sand activates",
+        input_a: 554,
+        input_b: 553,
+        output_a: 555,
+        output_b: 553,
+        probability: 0.8,
+        min_charge: 100,
+    ),
+    // Toggle Off adjacent to Toggle On: charge-driven flip (not self-replicating)
+    // Handled by the charge-gated Off+Wire rules above — Toggle On conducts charge.
+    (
+        name: "Toggle Off+LED activates",
+        input_a: 554,
+        input_b: 558,
+        output_a: 555,
+        output_b: 558,
+        probability: 0.8,
+        min_charge: 100,
+    ),
+
+    // Toggle-ite On + conductor → Toggle-ite Off + conductor (when uncharged)
+    (
+        name: "Toggle On+Wire deactivates",
+        input_a: 555,
+        input_b: 550,
+        output_a: 554,
+        output_b: 550,
+        probability: 0.5,
+        max_charge: 10,
+    ),
+    (
+        name: "Toggle On+Resistor deactivates",
+        input_a: 555,
+        input_b: 551,
+        output_a: 554,
+        output_b: 551,
+        probability: 0.5,
+        max_charge: 10,
+    ),
+    (
+        name: "Toggle On+Signal Sand deactivates",
+        input_a: 555,
+        input_b: 553,
+        output_a: 554,
+        output_b: 553,
+        probability: 0.5,
+        max_charge: 10,
+    ),
+    (
+        name: "Toggle On+Insulator deactivates",
+        input_a: 555,
+        input_b: 552,
+        output_a: 554,
+        output_b: 552,
+        probability: 0.5,
+        max_charge: 10,
+    ),
+    (
+        name: "Toggle On+LED deactivates",
+        input_a: 555,
+        input_b: 558,
+        output_a: 554,
+        output_b: 558,
+        probability: 0.5,
+        max_charge: 10,
+    ),
+
+    // ─── Short Circuit / Overload ────────────────────────────────────────
+    // Extreme charge causes conductor meltdown
+
+    (
+        name: "Wire overload melts",
+        input_a: 550,
+        input_b: 550,
+        output_a: 72,
+        output_b: 131,
+        probability: 0.3,
+        temp_delta: 200,
+        min_charge: 200,
+    ),
+    (
+        name: "Wire+Resistor overload",
+        input_a: 550,
+        input_b: 551,
+        output_a: 72,
+        output_b: 131,
+        probability: 0.25,
+        temp_delta: 250,
+        min_charge: 200,
+    ),
+    (
+        name: "Resistor overload burns",
+        input_a: 551,
+        input_b: 551,
+        output_a: 9,
+        output_b: 131,
+        probability: 0.35,
+        temp_delta: 300,
+        min_charge: 180,
+    ),
+    (
+        name: "Signal Sand overload shatters",
+        input_a: 553,
+        input_b: 553,
+        output_a: 0,
+        output_b: 131,
+        probability: 0.2,
+        temp_delta: 150,
+        min_charge: 220,
+    ),
+    (
+        name: "LED overload shatters",
+        input_a: 558,
+        input_b: 558,
+        output_a: 0,
+        output_b: 131,
+        probability: 0.15,
+        temp_delta: 100,
+        min_charge: 200,
+    ),
+    (
+        name: "Wire+Ground short circuit",
+        input_a: 550,
+        input_b: 557,
+        output_a: 72,
+        output_b: 131,
+        probability: 0.4,
+        temp_delta: 350,
+        min_charge: 230,
+    ),
+
+    // ─── Fuse Blowing ────────────────────────────────────────────────────
+    // Fuse Wire melts at high temperature (triggered by Joule heating)
+
+    (
+        name: "Fuse Wire blows hot",
+        input_a: 559,
+        input_b: 550,
+        output_a: 0,
+        output_b: 131,
+        probability: 0.6,
+        temp_delta: 50,
+        min_temp: 500,
+    ),
+    (
+        name: "Fuse Wire blows near resistor",
+        input_a: 559,
+        input_b: 551,
+        output_a: 0,
+        output_b: 131,
+        probability: 0.7,
+        temp_delta: 50,
+        min_temp: 450,
+    ),
+    (
+        name: "Fuse Wire blows near fire",
+        input_a: 559,
+        input_b: 5,
+        output_a: 72,
+        output_b: 5,
+        probability: 0.5,
+        temp_delta: 100,
+        min_temp: 400,
+    ),
+    (
+        name: "Fuse Wire blows near ember",
+        input_a: 559,
+        input_b: 132,
+        output_a: 72,
+        output_b: 132,
+        probability: 0.4,
+        temp_delta: 80,
+        min_temp: 350,
+    ),
+    (
+        name: "Fuse Wire charge overload",
+        input_a: 559,
+        input_b: 559,
+        output_a: 0,
+        output_b: 131,
+        probability: 0.5,
+        temp_delta: 100,
+        min_charge: 150,
+    ),
+
+    // ─── Electrolysis ────────────────────────────────────────────────────
+    // Electrical charge decomposes water and other liquids
+
+    (
+        name: "Power Source electrolyzes Water",
+        input_a: 556,
+        input_b: 3,
+        output_a: 556,
+        output_b: 7,
+        probability: 0.3,
+        temp_delta: 20,
+        min_charge: 50,
+    ),
+    (
+        name: "Wire electrolyzes Water",
+        input_a: 550,
+        input_b: 3,
+        output_a: 550,
+        output_b: 7,
+        probability: 0.15,
+        temp_delta: 15,
+        min_charge: 80,
+    ),
+    (
+        name: "Resistor boils Water",
+        input_a: 551,
+        input_b: 3,
+        output_a: 551,
+        output_b: 7,
+        probability: 0.25,
+        temp_delta: 30,
+        min_charge: 60,
+    ),
+    (
+        name: "Fuse Wire electrolyzes Water",
+        input_a: 559,
+        input_b: 3,
+        output_a: 559,
+        output_b: 7,
+        probability: 0.2,
+        temp_delta: 25,
+        min_charge: 70,
+    ),
+
+    // ─── Electrical Damage to Organics ───────────────────────────────────
+    // High charge chars organic materials
+
+    // Wood (8) burns from electrical arc
+    (
+        name: "Wire arcs to Wood",
+        input_a: 550,
+        input_b: 8,
+        output_a: 550,
+        output_b: 5,
+        probability: 0.2,
+        temp_delta: 100,
+        min_charge: 150,
+    ),
+    (
+        name: "Resistor ignites Wood",
+        input_a: 551,
+        input_b: 8,
+        output_a: 551,
+        output_b: 5,
+        probability: 0.3,
+        temp_delta: 120,
+        min_charge: 120,
+    ),
+    // Grass (100) burns from electrical
+    (
+        name: "Wire arcs to Grass",
+        input_a: 550,
+        input_b: 100,
+        output_a: 550,
+        output_b: 5,
+        probability: 0.3,
+        temp_delta: 80,
+        min_charge: 120,
+    ),
+    // Leaf (101) burns from electrical
+    (
+        name: "Wire arcs to Leaf",
+        input_a: 550,
+        input_b: 101,
+        output_a: 550,
+        output_b: 5,
+        probability: 0.3,
+        temp_delta: 80,
+        min_charge: 120,
+    ),
+    // Paper (106) ignites easily from spark
+    (
+        name: "Wire arcs to Paper",
+        input_a: 550,
+        input_b: 106,
+        output_a: 550,
+        output_b: 5,
+        probability: 0.4,
+        temp_delta: 90,
+        min_charge: 100,
+    ),
+    // Cloth (105) ignites from spark
+    (
+        name: "Wire arcs to Cloth",
+        input_a: 550,
+        input_b: 105,
+        output_a: 550,
+        output_b: 5,
+        probability: 0.35,
+        temp_delta: 85,
+        min_charge: 110,
+    ),
+    // Rope (104) burns
+    (
+        name: "Wire arcs to Rope",
+        input_a: 550,
+        input_b: 104,
+        output_a: 550,
+        output_b: 5,
+        probability: 0.3,
+        temp_delta: 80,
+        min_charge: 120,
+    ),
+
+    // ─── Metal Interactions ──────────────────────────────────────────────
+    // Charged conductors cause reactions with nearby metals
+
+    // Iron (50) rusts faster with electrolysis
+    (
+        name: "Wire accelerates Iron corrosion",
+        input_a: 550,
+        input_b: 50,
+        output_a: 550,
+        output_b: 77,
+        probability: 0.15,
+        temp_delta: 10,
+        min_charge: 100,
+    ),
+    // Zinc (57) electroplates
+    (
+        name: "Wire electroplates Zinc",
+        input_a: 550,
+        input_b: 57,
+        output_a: 550,
+        output_b: 57,
+        probability: 0.1,
+        min_charge: 80,
+    ),
+    // Aluminum (54) sparks from high charge
+    (
+        name: "Wire arcs to Aluminum",
+        input_a: 550,
+        input_b: 54,
+        output_a: 550,
+        output_b: 131,
+        probability: 0.1,
+        temp_delta: 150,
+        min_charge: 200,
+    ),
+    // Tin (55) melts from electrical heating
+    (
+        name: "Resistor melts Tin",
+        input_a: 551,
+        input_b: 55,
+        output_a: 551,
+        output_b: 75,
+        probability: 0.2,
+        temp_delta: 60,
+        min_charge: 120,
+        min_temp: 200,
+    ),
+    // Lead (56) melts from electrical heating
+    (
+        name: "Resistor melts Lead",
+        input_a: 551,
+        input_b: 56,
+        output_a: 551,
+        output_b: 76,
+        probability: 0.15,
+        temp_delta: 50,
+        min_charge: 130,
+        min_temp: 250,
+    ),
+
+    // ─── Power Source Interactions ────────────────────────────────────────
+
+    (
+        name: "Power Source sparks Air",
+        input_a: 556,
+        input_b: 0,
+        output_a: 556,
+        output_b: 131,
+        probability: 0.02,
+        temp_delta: 30,
+        min_charge: 200,
+    ),
+    (
+        name: "Power Source ignites nearby Wood",
+        input_a: 556,
+        input_b: 8,
+        output_a: 556,
+        output_b: 5,
+        probability: 0.15,
+        temp_delta: 80,
+        min_charge: 180,
+    ),
+    (
+        name: "Power Source chars Grass",
+        input_a: 556,
+        input_b: 100,
+        output_a: 556,
+        output_b: 9,
+        probability: 0.2,
+        temp_delta: 60,
+        min_charge: 150,
+    ),
+
+    // ─── Water + Electrical Hazards ──────────────────────────────────────
+    // Water damages electrical components
+
+    (
+        name: "Water shorts Wire",
+        input_a: 3,
+        input_b: 550,
+        output_a: 7,
+        output_b: 72,
+        probability: 0.1,
+        temp_delta: 40,
+        min_charge: 100,
+    ),
+    (
+        name: "Water shorts Resistor",
+        input_a: 3,
+        input_b: 551,
+        output_a: 7,
+        output_b: 9,
+        probability: 0.15,
+        temp_delta: 30,
+        min_charge: 80,
+    ),
+    (
+        name: "Water damages Signal Sand",
+        input_a: 3,
+        input_b: 553,
+        output_a: 3,
+        output_b: 0,
+        probability: 0.1,
+        temp_delta: 5,
+    ),
+    (
+        name: "Water damages LED Crystal",
+        input_a: 3,
+        input_b: 558,
+        output_a: 3,
+        output_b: 0,
+        probability: 0.05,
+        temp_delta: 5,
+    ),
+    (
+        name: "Water corrodes Fuse Wire",
+        input_a: 3,
+        input_b: 559,
+        output_a: 3,
+        output_b: 77,
+        probability: 0.08,
+        temp_delta: 5,
+    ),
+
+    // ─── Insulator Protection ────────────────────────────────────────────
+    // Insulator blocks charge propagation (handled by shader)
+    // but also has physical protection rules
+
+    (
+        name: "Fire damages Insulator",
+        input_a: 5,
+        input_b: 552,
+        output_a: 5,
+        output_b: 6,
+        probability: 0.2,
+        temp_delta: 50,
+        min_temp: 400,
+    ),
+    (
+        name: "Ember damages Insulator",
+        input_a: 132,
+        input_b: 552,
+        output_a: 132,
+        output_b: 6,
+        probability: 0.15,
+        temp_delta: 30,
+        min_temp: 350,
+    ),
+
+    // ─── Ground Interactions ─────────────────────────────────────────────
+
+    (
+        name: "Ground absorbs Spark",
+        input_a: 557,
+        input_b: 131,
+        output_a: 557,
+        output_b: 0,
+        probability: 0.9,
+    ),
+    (
+        name: "Ground absorbs Ember",
+        input_a: 557,
+        input_b: 132,
+        output_a: 557,
+        output_b: 0,
+        probability: 0.7,
+    ),
+
+    // ─── Spark Interactions with Electrical ──────────────────────────────
+
+    (
+        name: "Spark charges Wire",
+        input_a: 131,
+        input_b: 550,
+        output_a: 0,
+        output_b: 550,
+        probability: 0.5,
+        temp_delta: 20,
+    ),
+    (
+        name: "Spark charges Resistor",
+        input_a: 131,
+        input_b: 551,
+        output_a: 0,
+        output_b: 551,
+        probability: 0.5,
+        temp_delta: 30,
+    ),
+    (
+        name: "Spark charges Fuse Wire",
+        input_a: 131,
+        input_b: 559,
+        output_a: 0,
+        output_b: 559,
+        probability: 0.5,
+        temp_delta: 25,
+    ),
+    (
+        name: "Spark charges LED",
+        input_a: 131,
+        input_b: 558,
+        output_a: 0,
+        output_b: 558,
+        probability: 0.5,
+        temp_delta: 10,
+    ),
+    (
+        name: "Spark activates Toggle Off",
+        input_a: 131,
+        input_b: 554,
+        output_a: 0,
+        output_b: 555,
+        probability: 0.4,
+        temp_delta: 15,
+    ),
+
+    // ─── Thermal Damage to Electrical ────────────────────────────────────
+    // Hot environments damage electrical components
+
+    (
+        name: "Fire melts Wire",
+        input_a: 5,
+        input_b: 550,
+        output_a: 5,
+        output_b: 72,
+        probability: 0.15,
+        temp_delta: 50,
+        min_temp: 600,
+    ),
+    (
+        name: "Fire burns Resistor",
+        input_a: 5,
+        input_b: 551,
+        output_a: 5,
+        output_b: 9,
+        probability: 0.2,
+        temp_delta: 40,
+        min_temp: 500,
+    ),
+    (
+        name: "Fire destroys Signal Sand",
+        input_a: 5,
+        input_b: 553,
+        output_a: 5,
+        output_b: 0,
+        probability: 0.25,
+        temp_delta: 30,
+        min_temp: 400,
+    ),
+    (
+        name: "Fire shatters LED Crystal",
+        input_a: 5,
+        input_b: 558,
+        output_a: 5,
+        output_b: 0,
+        probability: 0.2,
+        temp_delta: 30,
+        min_temp: 500,
+    ),
+    (
+        name: "Ember damages Wire",
+        input_a: 132,
+        input_b: 550,
+        output_a: 132,
+        output_b: 72,
+        probability: 0.1,
+        temp_delta: 40,
+        min_temp: 700,
+    ),
+    (
+        name: "Ember burns Resistor",
+        input_a: 132,
+        input_b: 551,
+        output_a: 132,
+        output_b: 9,
+        probability: 0.15,
+        temp_delta: 30,
+        min_temp: 600,
+    ),
+
+    // ─── Cross-System: Pressure + Electrical ─────────────────────────────
+    // High pressure combined with charge causes extra damage
+
+    (
+        name: "Pressurized Wire sparks",
+        input_a: 550,
+        input_b: 0,
+        output_a: 550,
+        output_b: 131,
+        probability: 0.05,
+        temp_delta: 20,
+        min_charge: 150,
+        pressure_delta: -5,
+    ),
+    (
+        name: "Pressurized Resistor overheats",
+        input_a: 551,
+        input_b: 0,
+        output_a: 551,
+        output_b: 131,
+        probability: 0.04,
+        temp_delta: 40,
+        min_charge: 160,
+        pressure_delta: -3,
+    ),
+
+    // ─── Electrical Component Crafting ────────────────────────────────────
+    // Combining materials to create electrical components
+
+    // Copper (51) + Spark → Copper Wire
+    (
+        name: "Spark forges Copper Wire",
+        input_a: 131,
+        input_b: 51,
+        output_a: 0,
+        output_b: 550,
+        probability: 0.1,
+        temp_delta: 50,
+        min_temp: 300,
+    ),
+    // Iron (50) + Resistor Paste → Signal Sand (pressure-forged)
+    (
+        name: "Resistor+Iron makes Signal Sand",
+        input_a: 551,
+        input_b: 50,
+        output_a: 553,
+        output_b: 553,
+        probability: 0.05,
+        temp_delta: 30,
+        min_temp: 400,
+        min_charge: 100,
+    ),
+
+    // ─── Exotic + Electrical ─────────────────────────────────────────────
+
+    // Plasma (200) supercharges conductors
+    (
+        name: "Plasma supercharges Wire",
+        input_a: 200,
+        input_b: 550,
+        output_a: 0,
+        output_b: 550,
+        probability: 0.3,
+        temp_delta: 80,
+    ),
+    // Crystal (210) resonates with LED
+    (
+        name: "Crystal resonates with LED",
+        input_a: 210,
+        input_b: 558,
+        output_a: 210,
+        output_b: 558,
+        probability: 0.1,
+        min_charge: 50,
+    ),
+    // Void Matter (213) absorbs electrical charge
+    (
+        name: "Void Matter absorbs Wire charge",
+        input_a: 213,
+        input_b: 550,
+        output_a: 213,
+        output_b: 72,
+        probability: 0.2,
+        temp_delta: -50,
+        min_charge: 100,
+    ),
+    // Dark Energy (217) powers electrical
+    (
+        name: "Dark Energy powers Wire",
+        input_a: 217,
+        input_b: 550,
+        output_a: 217,
+        output_b: 550,
+        probability: 0.15,
+    ),
+
+    // ─── Acid + Electrical ───────────────────────────────────────────────
+    // Acid (166) corrodes electrical components
+
+    (
+        name: "Acid corrodes Wire",
+        input_a: 166,
+        input_b: 550,
+        output_a: 166,
+        output_b: 78,
+        probability: 0.25,
+        temp_delta: 15,
+    ),
+    (
+        name: "Acid corrodes Fuse Wire",
+        input_a: 166,
+        input_b: 559,
+        output_a: 166,
+        output_b: 78,
+        probability: 0.3,
+        temp_delta: 15,
+    ),
+    (
+        name: "Acid dissolves Resistor",
+        input_a: 166,
+        input_b: 551,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.35,
+        temp_delta: 20,
+    ),
+    (
+        name: "Acid dissolves Signal Sand",
+        input_a: 166,
+        input_b: 553,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.3,
+        temp_delta: 10,
+    ),
+    (
+        name: "Acid dissolves Insulator",
+        input_a: 166,
+        input_b: 552,
+        output_a: 166,
+        output_b: 0,
+        probability: 0.2,
+        temp_delta: 10,
+    ),
+
+    // ─── Lava + Electrical ───────────────────────────────────────────────
+    // Lava (4) destroys electrical components
+
+    (
+        name: "Lava melts Wire",
+        input_a: 4,
+        input_b: 550,
+        output_a: 4,
+        output_b: 72,
+        probability: 0.5,
+        temp_delta: 100,
+    ),
+    (
+        name: "Lava melts Fuse Wire",
+        input_a: 4,
+        input_b: 559,
+        output_a: 4,
+        output_b: 72,
+        probability: 0.6,
+        temp_delta: 100,
+    ),
+    (
+        name: "Lava destroys Resistor",
+        input_a: 4,
+        input_b: 551,
+        output_a: 4,
+        output_b: 0,
+        probability: 0.5,
+        temp_delta: 80,
+    ),
+    (
+        name: "Lava melts Insulator",
+        input_a: 4,
+        input_b: 552,
+        output_a: 4,
+        output_b: 6,
+        probability: 0.4,
+        temp_delta: 60,
+    ),
+    (
+        name: "Lava shatters LED Crystal",
+        input_a: 4,
+        input_b: 558,
+        output_a: 4,
+        output_b: 0,
+        probability: 0.45,
+        temp_delta: 70,
+    ),
+    (
+        name: "Lava melts Signal Sand",
+        input_a: 4,
+        input_b: 553,
+        output_a: 4,
+        output_b: 0,
+        probability: 0.4,
+        temp_delta: 50,
+    ),
+    (
+        name: "Lava destroys Toggle Off",
+        input_a: 4,
+        input_b: 554,
+        output_a: 4,
+        output_b: 72,
+        probability: 0.4,
+        temp_delta: 60,
+    ),
+    (
+        name: "Lava destroys Toggle On",
+        input_a: 4,
+        input_b: 555,
+        output_a: 4,
+        output_b: 72,
+        probability: 0.4,
+        temp_delta: 60,
+    ),
+    (
+        name: "Lava destroys Ground",
+        input_a: 4,
+        input_b: 557,
+        output_a: 4,
+        output_b: 72,
+        probability: 0.3,
+        temp_delta: 80,
+    ),
+    (
+        name: "Lava destroys Power Source",
+        input_a: 4,
+        input_b: 556,
+        output_a: 4,
+        output_b: 72,
+        probability: 0.25,
+        temp_delta: 90,
+    ),
+]
