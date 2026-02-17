@@ -777,6 +777,7 @@
         density: 2330.0,
         color: (0.30, 0.30, 0.35),
         thermal_conductivity: 0.50,
+        electrical_conductivity: 0.30,
         structural_integrity: 25.0,
     ),
     (
@@ -787,6 +788,7 @@
         color: (0.20, 0.25, 0.40),
         emission: 0.03,
         thermal_conductivity: 0.80,
+        electrical_conductivity: 0.99,
         structural_integrity: 30.0,
     ),
     (

@@ -1,0 +1,133 @@
+[
+    // ── Electrical Materials ──────────────────────────────────────────
+    // M15: Dedicated electrical components for charge propagation,
+    // logic gates, and circuit-building gameplay.
+
+    // 550: Copper Wire — standard conductor
+    (
+        id: 550,
+        name: "Copper Wire",
+        phase: Solid,
+        density: 8900.0,
+        color: (0.72, 0.45, 0.2),
+        thermal_conductivity: 0.90,
+        structural_integrity: 30.0,
+        electrical_conductivity: 0.95,
+        electrical_resistance: 0.05,
+    ),
+    // 551: Resistor Paste — high Joule heating
+    (
+        id: 551,
+        name: "Resistor Paste",
+        phase: Solid,
+        density: 3200.0,
+        color: (0.4, 0.35, 0.3),
+        thermal_conductivity: 0.30,
+        structural_integrity: 15.0,
+        electrical_conductivity: 0.40,
+        electrical_resistance: 0.80,
+    ),
+    // 552: Insulator Coat — blocks charge
+    (
+        id: 552,
+        name: "Insulator Coat",
+        phase: Solid,
+        density: 1200.0,
+        color: (0.9, 0.85, 0.7),
+        thermal_conductivity: 0.10,
+        structural_integrity: 20.0,
+        electrical_conductivity: 0.0,
+        electrical_resistance: 0.0,
+    ),
+    // 553: Signal Sand — AND gate (needs 2+ charged neighbors)
+    (
+        id: 553,
+        name: "Signal Sand",
+        phase: Powder,
+        density: 2600.0,
+        color: (0.6, 0.55, 0.8),
+        thermal_conductivity: 0.25,
+        structural_integrity: 0.0,
+        electrical_conductivity: 0.70,
+        electrical_resistance: 0.10,
+        activation_threshold: 2,
+    ),
+    // 554: Toggle-ite Off — latch off state (no conductivity)
+    (
+        id: 554,
+        name: "Toggle-ite Off",
+        phase: Solid,
+        density: 4000.0,
+        color: (0.3, 0.3, 0.35),
+        thermal_conductivity: 0.20,
+        structural_integrity: 25.0,
+        electrical_conductivity: 0.0,
+        electrical_resistance: 0.0,
+    ),
+    // 555: Toggle-ite On — latch on state (conductive)
+    (
+        id: 555,
+        name: "Toggle-ite On",
+        phase: Solid,
+        density: 4000.0,
+        color: (0.4, 0.9, 0.4),
+        emission: 0.5,
+        thermal_conductivity: 0.20,
+        structural_integrity: 25.0,
+        electrical_conductivity: 0.80,
+        electrical_resistance: 0.10,
+    ),
+    // 556: Power Source — constant charge emitter
+    (
+        id: 556,
+        name: "Power Source",
+        phase: Solid,
+        density: 5000.0,
+        color: (1.0, 0.9, 0.2),
+        emission: 1.5,
+        thermal_conductivity: 0.30,
+        structural_integrity: 40.0,
+        electrical_conductivity: 0.0,
+        electrical_resistance: 0.0,
+        charge_emission: 255,
+    ),
+    // 557: Ground — charge sink (high conductivity, zero resistance)
+    (
+        id: 557,
+        name: "Ground",
+        phase: Solid,
+        density: 7800.0,
+        color: (0.2, 0.2, 0.2),
+        thermal_conductivity: 0.80,
+        structural_integrity: 45.0,
+        electrical_conductivity: 0.95,
+        electrical_resistance: 0.0,
+    ),
+    // 558: LED Crystal — emits light proportional to charge
+    (
+        id: 558,
+        name: "LED Crystal",
+        phase: Solid,
+        density: 3500.0,
+        color: (0.5, 0.8, 1.0),
+        emission: 0.2,
+        thermal_conductivity: 0.15,
+        structural_integrity: 15.0,
+        electrical_conductivity: 0.30,
+        electrical_resistance: 0.05,
+    ),
+    // 559: Fuse Wire — melts under high current (high resistance for heating)
+    (
+        id: 559,
+        name: "Fuse Wire",
+        phase: Solid,
+        density: 8500.0,
+        color: (0.65, 0.55, 0.4),
+        thermal_conductivity: 0.70,
+        structural_integrity: 10.0,
+        phase_change_temp: 600.0,
+        phase_change_product: 0,
+        electrical_conductivity: 0.90,
+        electrical_resistance: 0.60,
+    ),
+]

@@ -42,6 +42,7 @@
         absorption_rate: 0.15,
         viscosity: 0.1,
         thermal_conductivity: 0.6,
+        electrical_conductivity: 0.05,
         phase_change_temp: 373.0,
         phase_change_product: 7,
         structural_integrity: 0.0,
