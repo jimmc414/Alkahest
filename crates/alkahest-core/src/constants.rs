@@ -110,3 +110,23 @@ pub const MAX_TRANSPARENT_STEPS: u32 = 32;
 
 /// LOD distance threshold in voxels. Beyond this, use octree averaged color.
 pub const LOD_DISTANCE_THRESHOLD: f32 = 128.0;
+
+// ── M15: Electrical System Constants ─────────────────────────────────
+
+/// Electrical diffusion rate per tick. CFL constraint: ELECTRICAL_DIFFUSION_RATE * max_conductivity * 6 < 1.0.
+pub const ELECTRICAL_DIFFUSION_RATE: f32 = 0.10;
+
+/// Maximum charge value (u8 range).
+pub const CHARGE_MAX: u32 = 255;
+
+/// Bytes per voxel for the charge buffer.
+pub const CHARGE_BYTES_PER_VOXEL: u32 = 1;
+
+/// Bytes per chunk for the charge buffer (32^3 * 1).
+pub const CHARGE_BYTES_PER_CHUNK: u32 = VOXELS_PER_CHUNK * CHARGE_BYTES_PER_VOXEL;
+
+/// Per-tick charge decay toward zero for non-emitting voxels.
+pub const CHARGE_DECAY_RATE: u32 = 2;
+
+/// Joule heating factor: temp_increase = charge^2 * resistance * JOULE_HEATING_FACTOR.
+pub const JOULE_HEATING_FACTOR: f32 = 0.01;

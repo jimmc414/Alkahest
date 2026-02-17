@@ -39,6 +39,11 @@ pub const SYNTHETICS_EXT_END: u16 = 499;
 pub const EXOTIC_EXT_START: u16 = 500;
 pub const EXOTIC_EXT_END: u16 = 549;
 
+// ── M15: Electrical Range ─────────────────────────────────────────
+
+pub const ELECTRICAL_START: u16 = 550;
+pub const ELECTRICAL_END: u16 = 569;
+
 /// First valid material ID for mod-defined materials.
 pub const MOD_ID_START: u16 = 10000;
 
@@ -55,7 +60,8 @@ pub fn get_category(id: u16) -> &'static str {
             "Synthetics"
         }
         EXOTIC_START..=EXOTIC_END | EXOTIC_EXT_START..=EXOTIC_EXT_END => "Exotic",
-        550..=9999 => "Reserved",
+        ELECTRICAL_START..=ELECTRICAL_END => "Electrical",
+        570..=9999 => "Reserved",
         MOD_ID_START.. => "Mod",
     }
 }
@@ -94,8 +100,11 @@ mod tests {
         assert_eq!(get_category(499), "Synthetics");
         assert_eq!(get_category(500), "Exotic");
         assert_eq!(get_category(549), "Exotic");
+        // Electrical
+        assert_eq!(get_category(550), "Electrical");
+        assert_eq!(get_category(569), "Electrical");
         // Reserved and Mod
-        assert_eq!(get_category(550), "Reserved");
+        assert_eq!(get_category(570), "Reserved");
         assert_eq!(get_category(9999), "Reserved");
         assert_eq!(get_category(10000), "Mod");
         assert_eq!(get_category(10001), "Mod");
