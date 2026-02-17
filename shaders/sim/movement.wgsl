@@ -69,7 +69,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     }
 
     // Look up source material properties (density-driven movement, C-DESIGN-1)
-    let src_props_0 = materials[src_mat_id * 3u];
+    let src_props_0 = materials[src_mat_id * 4u];
     let src_density = src_props_0.x;
     let src_phase = u32(src_props_0.y);
 
@@ -88,7 +88,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
         if src_phase != PHASE_LIQUID {
             return;
         }
-        let src_props_1 = materials[src_mat_id * 3u + 1u];
+        let src_props_1 = materials[src_mat_id * 4u + 1u];
         let viscosity = src_props_1.w;
         if viscosity > 0.0 {
             let h = sim_hash(pos.x, pos.y, pos.z, move_params.tick);
@@ -130,7 +130,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     }
 
     // Density-driven displacement: if destination is lighter, swap
-    let dst_props_0 = materials[dst_mat_id * 3u];
+    let dst_props_0 = materials[dst_mat_id * 4u];
     let dst_density = dst_props_0.x;
     let dst_phase = u32(dst_props_0.y);
 

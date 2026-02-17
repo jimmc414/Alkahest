@@ -69,7 +69,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     var my_temp = unpack_temperature(voxel);
 
     // --- Self-decay ---
-    let props_1 = materials[mat_id * 3u + 1u];
+    let props_1 = materials[mat_id * 4u + 1u];
     let decay_rate = u32(props_1.x);
     let decay_threshold = u32(props_1.y);
     let decay_product = u32(props_1.z);
@@ -91,7 +91,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     // --- Upward phase change ---
     {
-        let props_2 = materials[unpack_material_id(voxel) * 3u + 2u];
+        let props_2 = materials[unpack_material_id(voxel) * 4u + 2u];
         let phase_change_temp_q = u32(props_2.y);
         let phase_change_product = u32(props_2.z);
         if phase_change_temp_q > 0u && my_temp >= phase_change_temp_q {

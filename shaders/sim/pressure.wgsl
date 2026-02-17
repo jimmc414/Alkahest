@@ -77,9 +77,9 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     var my_pressure = i32(unpack_pressure(voxel));
 
     // Read material properties
-    let props_0 = materials[mat_id * 3u];
+    let props_0 = materials[mat_id * 4u];
     let phase = u32(props_0.y);
-    let props_2 = materials[mat_id * 3u + 2u];
+    let props_2 = materials[mat_id * 4u + 2u];
     let structural_integrity = props_2.w;
 
     // --- Enclosure check: count non-air face neighbors ---

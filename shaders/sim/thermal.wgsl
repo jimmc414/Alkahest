@@ -59,7 +59,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     var my_temp = unpack_temperature(voxel);
 
-    let props_2 = materials[mat_id * 3u + 2u];
+    let props_2 = materials[mat_id * 4u + 2u];
     let my_conductivity = props_2.x;
 
     // --- 26-neighbor diffusion with cross-chunk reads ---
@@ -82,7 +82,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
                 }
 
                 let neighbor_temp = unpack_temperature(neighbor_voxel);
-                let neighbor_props_2 = materials[neighbor_mat * 3u + 2u];
+                let neighbor_props_2 = materials[neighbor_mat * 4u + 2u];
                 let neighbor_conductivity = neighbor_props_2.x;
 
                 let abs_sum = abs(dx) + abs(dy) + abs(dz);
@@ -110,7 +110,7 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     }
 
     // --- Convection ---
-    let props_0 = materials[mat_id * 3u];
+    let props_0 = materials[mat_id * 4u];
     let phase = u32(props_0.y);
     var vy = unpack_vel_y(voxel);
     if (phase == PHASE_LIQUID || phase == PHASE_GAS) && u32(new_temp) > AMBIENT_TEMP_QUANTIZED + CONVECTION_THRESHOLD {

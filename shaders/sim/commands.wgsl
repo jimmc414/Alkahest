@@ -49,7 +49,7 @@ fn apply_place(pos: vec3<i32>, chunk_idx: u32, mat_id: u32) {
     let idx = write_pool_voxel_index(pos, chunk_idx);
     var temp = 150u;
     if mat_id > 0u {
-        let props_1 = materials[mat_id * 3u + 1u];
+        let props_1 = materials[mat_id * 4u + 1u];
         let decay_rate = u32(props_1.x);
         let decay_threshold = u32(props_1.y);
         if decay_rate > 0u && decay_threshold > 0u {
