@@ -426,4 +426,34 @@ mod tests {
             "different rules should produce different hash"
         );
     }
+
+    #[test]
+    fn test_rule_hash_differs_on_material_change() {
+        let materials1 = test_materials();
+        let mut materials2 = test_materials();
+        materials2.materials[1].density = 9999.0; // change Stone density
+        let rules = test_rules();
+
+        let hash1 = compute_rule_hash(&materials1, &rules);
+        let hash2 = compute_rule_hash(&materials2, &rules);
+        assert_ne!(
+            hash1, hash2,
+            "changing a material property should produce a different hash"
+        );
+    }
+
+    #[test]
+    fn test_rule_hash_differs_on_rule_change() {
+        let materials = test_materials();
+        let rules1 = test_rules();
+        let mut rules2 = test_rules();
+        rules2.rules[0].temp_delta = 42; // change temp_delta
+
+        let hash1 = compute_rule_hash(&materials, &rules1);
+        let hash2 = compute_rule_hash(&materials, &rules2);
+        assert_ne!(
+            hash1, hash2,
+            "changing a rule field should produce a different hash"
+        );
+    }
 }

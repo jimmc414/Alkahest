@@ -343,6 +343,157 @@ mod tests {
     }
 
     #[test]
+    fn test_load_electrical_materials() {
+        let electrical = include_str!("../../../data/materials/electrical.ron");
+        let table = load_materials_from_str(electrical).expect("should parse electrical.ron");
+        assert_eq!(
+            table.len(),
+            10,
+            "expected 10 electrical materials (IDs 550-559)"
+        );
+        // Verify first and last IDs
+        assert!(table.get(550).is_some(), "Copper Wire (550) missing");
+        assert!(table.get(559).is_some(), "Fuse Wire (559) missing");
+        assert_eq!(table.get(550).expect("should exist").name, "Copper Wire");
+        assert_eq!(table.get(559).expect("should exist").name, "Fuse Wire");
+    }
+
+    #[test]
+    fn test_load_electrical_rules() {
+        let electrical = include_str!("../../../data/rules/electrical.ron");
+        let set = load_rules_from_str(electrical).expect("should parse electrical.ron rules");
+        assert!(
+            set.len() >= 10,
+            "expected at least 10 electrical rules, got {}",
+            set.len()
+        );
+        // Verify a known rule exists
+        assert!(
+            set.rules
+                .iter()
+                .any(|r| r.name == "Toggle Off+Wire activates"),
+            "expected Toggle Off+Wire activates rule"
+        );
+    }
+
+    #[test]
+    fn test_empty_sources_returns_empty() {
+        let table = load_all_materials(&[]).expect("empty sources should succeed");
+        assert_eq!(table.len(), 0);
+    }
+
+    #[test]
+    fn test_merge_mod_conflict_reports_warnings() {
+        // Create base with a rule
+        let mut base_materials = MaterialTable {
+            materials: vec![
+                alkahest_core::material::MaterialDef {
+                    id: 0,
+                    name: "Air".into(),
+                    phase: alkahest_core::material::Phase::Gas,
+                    density: 0.0,
+                    color: (0.0, 0.0, 0.0),
+                    emission: 0.0,
+                    flammability: 0.0,
+                    ignition_temp: 0.0,
+                    decay_rate: 0,
+                    decay_threshold: 0,
+                    decay_product: 0,
+                    viscosity: 0.0,
+                    thermal_conductivity: 0.0,
+                    phase_change_temp: 0.0,
+                    phase_change_product: 0,
+                    structural_integrity: 0.0,
+                    opacity: None,
+                    absorption_rate: 0.0,
+                    electrical_conductivity: 0.0,
+                    electrical_resistance: 0.0,
+                    activation_threshold: 0,
+                    charge_emission: 0,
+                },
+                alkahest_core::material::MaterialDef {
+                    id: 1,
+                    name: "Stone".into(),
+                    phase: alkahest_core::material::Phase::Solid,
+                    density: 5000.0,
+                    color: (0.5, 0.5, 0.55),
+                    emission: 0.0,
+                    flammability: 0.0,
+                    ignition_temp: 0.0,
+                    decay_rate: 0,
+                    decay_threshold: 0,
+                    decay_product: 0,
+                    viscosity: 0.0,
+                    thermal_conductivity: 0.5,
+                    phase_change_temp: 0.0,
+                    phase_change_product: 0,
+                    structural_integrity: 63.0,
+                    opacity: None,
+                    absorption_rate: 0.0,
+                    electrical_conductivity: 0.0,
+                    electrical_resistance: 0.0,
+                    activation_threshold: 0,
+                    charge_emission: 0,
+                },
+            ],
+        };
+        let mut base_rules = RuleSet {
+            rules: vec![InteractionRule {
+                name: "BaseRule".into(),
+                input_a: 0,
+                input_b: 1,
+                output_a: 0,
+                output_b: 1,
+                probability: 0.5,
+                temp_delta: 0,
+                min_temp: 0,
+                max_temp: 0,
+                pressure_delta: 0,
+                min_charge: 0,
+                max_charge: 0,
+            }],
+        };
+
+        // Mod that overrides same input pair (0, 1)
+        let manifest_ron = r#"(
+            name: "Override Mod",
+            version: "1.0.0",
+            author: "Tester",
+            description: "Overrides a base rule",
+            load_order_hint: 100,
+        )"#;
+        let materials_ron = r#"[
+            (id: 10001, name: "ModMat", phase: Solid, density: 1000.0, color: (1.0, 0.0, 0.0)),
+        ]"#;
+        // This rule has input pair (0, 1) which conflicts with BaseRule
+        let rules_ron = r#"[
+            (name: "ModRule", input_a: 0, input_b: 1, output_a: 0, output_b: 1, probability: 0.9),
+        ]"#;
+
+        let mod_result =
+            load_mod(manifest_ron, &[materials_ron], &[rules_ron]).expect("should load mod");
+
+        let base_max_id = base_materials.max_id();
+        let mut remap = IdRemap::new(base_max_id);
+        let warnings = merge_mod(
+            &mut base_materials,
+            &mut base_rules,
+            &mod_result,
+            &mut remap,
+        );
+
+        assert!(
+            !warnings.is_empty(),
+            "expected warnings about rule override"
+        );
+        assert!(
+            warnings[0].contains("overrides"),
+            "warning should mention override: {}",
+            warnings[0]
+        );
+    }
+
+    #[test]
     fn test_merge_mod_into_base() {
         // Minimal base
         let mut base_materials = MaterialTable {

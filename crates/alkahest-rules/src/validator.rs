@@ -608,4 +608,185 @@ mod tests {
             .iter()
             .any(|e| matches!(e, ValidationError::DuplicateMaterialId(1))));
     }
+
+    #[test]
+    fn test_valid_rules_pass_validation() {
+        let table = twelve_materials();
+        let rules = RuleSet {
+            rules: vec![
+                InteractionRule {
+                    name: "Fire+Wood".into(),
+                    input_a: 5,
+                    input_b: 8,
+                    output_a: 5,
+                    output_b: 9, // transforms Wood -> Ash
+                    probability: 0.8,
+                    temp_delta: 200,
+                    min_temp: 0,
+                    max_temp: 0,
+                    pressure_delta: 0,
+                    min_charge: 0,
+                    max_charge: 0,
+                },
+                InteractionRule {
+                    name: "Water+Lava".into(),
+                    input_a: 3,
+                    input_b: 11,
+                    output_a: 7, // Water -> Steam
+                    output_b: 1, // Lava -> Stone
+                    probability: 1.0,
+                    temp_delta: -100,
+                    min_temp: 0,
+                    max_temp: 0,
+                    pressure_delta: 0,
+                    min_charge: 0,
+                    max_charge: 0,
+                },
+            ],
+        };
+        assert!(validate_rules(&rules, &table).is_ok());
+    }
+
+    #[test]
+    fn test_decay_threshold_exceeds_max() {
+        let table = MaterialTable {
+            materials: vec![{
+                let mut m = make_material(0, "OverDecay");
+                m.decay_threshold = 5000; // exceeds TEMP_QUANT_MAX_VALUE (4095)
+                m
+            }],
+        };
+        let result = validate_materials(&table);
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors
+            .iter()
+            .any(|e| matches!(e, ValidationError::DecayThresholdExceedsMax { .. })));
+    }
+
+    #[test]
+    fn test_electrical_cfl_violation() {
+        // ELECTRICAL_DIFFUSION_RATE (0.10) * conductivity * 6 >= 1.0
+        // conductivity = 1.0: 0.10 * 1.0 * 6 = 0.6 < 1.0 (OK)
+        // We need conductivity high enough: 0.10 * c * 6 >= 1.0 → c >= 1.667
+        // But electrical_conductivity > 1.0 also triggers ElectricalConductivityOutOfRange.
+        // So we use a value > 1.0 that triggers both errors.
+        let table = MaterialTable {
+            materials: vec![{
+                let mut m = make_material(0, "HighElecConductor");
+                m.electrical_conductivity = 2.0;
+                m
+            }],
+        };
+        let result = validate_materials(&table);
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(
+            errors
+                .iter()
+                .any(|e| matches!(e, ValidationError::ElectricalCflViolation { .. })),
+            "expected ElectricalCflViolation, got: {:?}",
+            errors
+        );
+    }
+
+    #[test]
+    fn test_multiple_errors_collected() {
+        let table = twelve_materials();
+        let rules = RuleSet {
+            rules: vec![
+                InteractionRule {
+                    name: "BadRef1".into(),
+                    input_a: 5,
+                    input_b: 99, // unknown
+                    output_a: 5,
+                    output_b: 9,
+                    probability: 1.0,
+                    temp_delta: 0,
+                    min_temp: 0,
+                    max_temp: 0,
+                    pressure_delta: 0,
+                    min_charge: 0,
+                    max_charge: 0,
+                },
+                InteractionRule {
+                    name: "BadRef2".into(),
+                    input_a: 200, // unknown
+                    input_b: 201, // unknown
+                    output_a: 0,
+                    output_b: 0,
+                    probability: 1.0,
+                    temp_delta: 0,
+                    min_temp: 0,
+                    max_temp: 0,
+                    pressure_delta: 0,
+                    min_charge: 0,
+                    max_charge: 0,
+                },
+            ],
+        };
+        let result = validate_rules(&rules, &table);
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        // BadRef1 has 1 unknown (99), BadRef2 has 2 unknowns (200, 201) = at least 3 errors
+        let ref_errors: Vec<_> = errors
+            .iter()
+            .filter(|e| matches!(e, ValidationError::UnknownMaterialRef { .. }))
+            .collect();
+        assert!(
+            ref_errors.len() >= 3,
+            "expected at least 3 UnknownMaterialRef errors, got {}",
+            ref_errors.len()
+        );
+    }
+
+    #[test]
+    fn test_non_overlapping_temp_ranges_no_false_infinite_loop() {
+        // A->B with temp range [100, 200], B->A with temp range [300, 400]
+        // These do not overlap, so no infinite loop should be detected.
+        let table = MaterialTable {
+            materials: vec![
+                make_material(0, "A"),
+                make_material(1, "B"),
+                make_material(2, "C"),
+                make_material(3, "D"),
+            ],
+        };
+        let rules = RuleSet {
+            rules: vec![
+                InteractionRule {
+                    name: "AtoB_cold".into(),
+                    input_a: 0,
+                    input_b: 1,
+                    output_a: 2,
+                    output_b: 3,
+                    probability: 1.0,
+                    temp_delta: 0,
+                    min_temp: 100,
+                    max_temp: 200,
+                    pressure_delta: 0,
+                    min_charge: 0,
+                    max_charge: 0,
+                },
+                InteractionRule {
+                    name: "BtoA_hot".into(),
+                    input_a: 2,
+                    input_b: 3,
+                    output_a: 0,
+                    output_b: 1,
+                    probability: 1.0,
+                    temp_delta: 0,
+                    min_temp: 300,
+                    max_temp: 400,
+                    pressure_delta: 0,
+                    min_charge: 0,
+                    max_charge: 0,
+                },
+            ],
+        };
+        assert!(
+            validate_rules(&rules, &table).is_ok(),
+            "disjoint temp ranges should not be flagged as infinite loop"
+        );
+    }
 }

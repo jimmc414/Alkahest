@@ -168,6 +168,30 @@ mod tests {
     }
 
     #[test]
+    fn test_dispatch_list_empty_when_all_static() {
+        let mut map = ChunkMap::with_capacity(64);
+        let c0 = IVec3::new(0, 0, 0);
+        let c1 = IVec3::new(1, 0, 0);
+        let c2 = IVec3::new(2, 0, 0);
+        map.load_chunk(c0);
+        map.load_chunk(c1);
+        map.load_chunk(c2);
+
+        // Put all chunks to sleep
+        for coord in &[c0, c1, c2] {
+            if let Some(chunk) = map.get_mut(coord) {
+                chunk.sleep();
+            }
+        }
+
+        let list = build_dispatch_list(&map);
+        assert!(
+            list.is_empty(),
+            "dispatch list should be empty when all chunks are Static"
+        );
+    }
+
+    #[test]
     fn test_descriptor_data_layout() {
         let mut map = ChunkMap::with_capacity(64);
         map.load_chunk(IVec3::new(0, 0, 0));

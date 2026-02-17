@@ -280,6 +280,19 @@ mod tests {
     }
 
     #[test]
+    fn test_different_seeds_different_terrain() {
+        let gen1 = TerrainGenerator::new(42);
+        let gen2 = TerrainGenerator::new(99);
+        let coord = IVec3::new(2, 0, 2);
+        let data1 = gen1.generate_chunk(coord);
+        let data2 = gen2.generate_chunk(coord);
+        assert_ne!(
+            data1, data2,
+            "different seeds should produce different terrain"
+        );
+    }
+
+    #[test]
     fn test_chunk_has_content() {
         let gen = TerrainGenerator::new(42);
         // Bottom chunk definitely has content

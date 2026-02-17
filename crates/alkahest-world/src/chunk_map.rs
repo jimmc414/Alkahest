@@ -205,6 +205,59 @@ mod tests {
     }
 
     #[test]
+    fn test_load_chunk_idempotent() {
+        let mut map = ChunkMap::with_capacity(64);
+        let coord = IVec3::new(2, 1, 3);
+        let slot1 = map.load_chunk(coord);
+        let slot2 = map.load_chunk(coord);
+        assert!(slot1.is_some());
+        assert!(slot2.is_some());
+        assert_eq!(
+            slot1.unwrap(),
+            slot2.unwrap(),
+            "loading same coord twice should return same slot"
+        );
+        // Should still only have one chunk loaded
+        assert_eq!(map.loaded_count(), 1);
+    }
+
+    #[test]
+    fn test_chunk_counts_reflect_state() {
+        let mut map = ChunkMap::with_capacity(64);
+        let c0 = IVec3::new(0, 0, 0);
+        let c1 = IVec3::new(1, 0, 0);
+        let c2 = IVec3::new(2, 0, 0);
+
+        map.load_chunk(c0);
+        map.load_chunk(c1);
+        map.load_chunk(c2);
+
+        // All 3 are active
+        let (total, active, static_count) = map.chunk_counts();
+        assert_eq!(total, 3);
+        assert_eq!(active, 3);
+        assert_eq!(static_count, 0);
+
+        // Sleep c1
+        if let Some(chunk) = map.get_mut(&c1) {
+            chunk.sleep();
+        }
+        let (total, active, static_count) = map.chunk_counts();
+        assert_eq!(total, 3);
+        assert_eq!(active, 2);
+        assert_eq!(static_count, 1);
+
+        // Sleep c2
+        if let Some(chunk) = map.get_mut(&c2) {
+            chunk.sleep();
+        }
+        let (total, active, static_count) = map.chunk_counts();
+        assert_eq!(total, 3);
+        assert_eq!(active, 1);
+        assert_eq!(static_count, 2);
+    }
+
+    #[test]
     fn test_pool_slot_allocation_and_free() {
         let mut map = ChunkMap::with_capacity(4);
 
