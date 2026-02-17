@@ -1,4 +1,4 @@
-use alkahest_core::constants::{DIFFUSION_RATE, TEMP_QUANT_MAX_VALUE};
+use alkahest_core::constants::{DIFFUSION_RATE, ELECTRICAL_DIFFUSION_RATE, TEMP_QUANT_MAX_VALUE};
 use alkahest_core::material::MaterialTable;
 use alkahest_core::rule::RuleSet;
 use std::collections::HashSet;
@@ -20,6 +20,18 @@ pub enum ValidationError {
     ThermalConductivityOutOfRange { name: String, value: f32 },
     #[error("CFL stability violated: DIFFUSION_RATE({rate}) * max_conductivity({conductivity}) * 26 = {product} >= 1.0")]
     CflStabilityViolation {
+        rate: f32,
+        conductivity: f32,
+        product: f32,
+    },
+    #[error("Material '{name}' electrical_conductivity {value} out of range [0.0, 1.0]")]
+    ElectricalConductivityOutOfRange { name: String, value: f32 },
+    #[error("Material '{name}' electrical_resistance {value} out of range [0.0, 1.0]")]
+    ElectricalResistanceOutOfRange { name: String, value: f32 },
+    #[error("Material '{name}' activation_threshold {value} out of range [0, 6]")]
+    ActivationThresholdOutOfRange { name: String, value: u8 },
+    #[error("Electrical CFL violated: ELECTRICAL_DIFFUSION_RATE({rate}) * max_conductivity({conductivity}) * 6 = {product} >= 1.0")]
+    ElectricalCflViolation {
         rate: f32,
         conductivity: f32,
         product: f32,
@@ -69,6 +81,27 @@ pub fn validate_materials(table: &MaterialTable) -> Result<(), Vec<ValidationErr
                 value: mat.thermal_conductivity,
             });
         }
+
+        if mat.electrical_conductivity < 0.0 || mat.electrical_conductivity > 1.0 {
+            errors.push(ValidationError::ElectricalConductivityOutOfRange {
+                name: mat.name.clone(),
+                value: mat.electrical_conductivity,
+            });
+        }
+
+        if mat.electrical_resistance < 0.0 || mat.electrical_resistance > 1.0 {
+            errors.push(ValidationError::ElectricalResistanceOutOfRange {
+                name: mat.name.clone(),
+                value: mat.electrical_resistance,
+            });
+        }
+
+        if mat.activation_threshold > 6 {
+            errors.push(ValidationError::ActivationThresholdOutOfRange {
+                name: mat.name.clone(),
+                value: mat.activation_threshold,
+            });
+        }
     }
 
     // CFL stability check: DIFFUSION_RATE * max_conductivity * 26 < 1.0
@@ -83,6 +116,21 @@ pub fn validate_materials(table: &MaterialTable) -> Result<(), Vec<ValidationErr
             rate: DIFFUSION_RATE,
             conductivity: max_conductivity,
             product: cfl_product,
+        });
+    }
+
+    // Electrical CFL: ELECTRICAL_DIFFUSION_RATE * max_electrical_conductivity * 6 < 1.0
+    let max_elec_conductivity = table
+        .materials
+        .iter()
+        .map(|m| m.electrical_conductivity)
+        .fold(0.0f32, f32::max);
+    let elec_cfl_product = ELECTRICAL_DIFFUSION_RATE * max_elec_conductivity * 6.0;
+    if elec_cfl_product >= 1.0 {
+        errors.push(ValidationError::ElectricalCflViolation {
+            rate: ELECTRICAL_DIFFUSION_RATE,
+            conductivity: max_elec_conductivity,
+            product: elec_cfl_product,
         });
     }
 
