@@ -23,6 +23,7 @@ mod tests {
             include_str!("../../../data/materials/metals.ron"),
             include_str!("../../../data/materials/synthetics.ron"),
             include_str!("../../../data/materials/exotic.ron"),
+            include_str!("../../../data/materials/electrical.ron"),
         ])
         .expect("all materials should load");
 
@@ -35,6 +36,7 @@ mod tests {
             include_str!("../../../data/rules/biological.ron"),
             include_str!("../../../data/rules/thermal.ron"),
             include_str!("../../../data/rules/synthesis.ron"),
+            include_str!("../../../data/rules/electrical.ron"),
         ])
         .expect("all rules should load");
 
@@ -381,6 +383,7 @@ mod tests {
             "Energy",
             "Synthetics",
             "Exotic",
+            "Electrical",
         ];
         let participating: HashSet<&str> =
             pair_counts.keys().flat_map(|(a, b)| vec![*a, *b]).collect();
@@ -416,6 +419,75 @@ mod tests {
             rules.len() >= 10_000,
             "Expected >= 10,000 rules, found {}",
             rules.len()
+        );
+    }
+
+    /// Verify electrical materials (IDs 550-559) are loaded.
+    #[test]
+    fn test_electrical_materials_exist() {
+        let (table, _) = load_all();
+        let electrical_ids: Vec<u16> = (550..=559).collect();
+        for &id in &electrical_ids {
+            assert!(
+                table.get(id).is_some(),
+                "Electrical material ID {} should be loaded",
+                id
+            );
+        }
+        // Verify they are categorized as Electrical
+        for &id in &electrical_ids {
+            assert_eq!(
+                defaults::get_category(id),
+                "Electrical",
+                "Material ID {} should be in Electrical category",
+                id
+            );
+        }
+    }
+
+    /// Verify all materials have electrical_conductivity in [0.0, 1.0].
+    #[test]
+    fn test_electrical_conductivity_valid() {
+        let (table, _) = load_all();
+        let mut violations = Vec::new();
+        for mat in &table.materials {
+            if mat.electrical_conductivity < 0.0 || mat.electrical_conductivity > 1.0 {
+                violations.push(format!(
+                    "{} (ID {}): electrical_conductivity = {}",
+                    mat.name, mat.id, mat.electrical_conductivity
+                ));
+            }
+            if mat.electrical_resistance < 0.0 || mat.electrical_resistance > 1.0 {
+                violations.push(format!(
+                    "{} (ID {}): electrical_resistance = {}",
+                    mat.name, mat.id, mat.electrical_resistance
+                ));
+            }
+        }
+        assert!(
+            violations.is_empty(),
+            "Materials with invalid electrical properties:\n{}",
+            violations.join("\n")
+        );
+    }
+
+    /// Verify electrical CFL stability: ELECTRICAL_DIFFUSION_RATE * max_conductivity * 6 < 1.0.
+    #[test]
+    fn test_electrical_cfl_stability() {
+        use alkahest_core::constants::ELECTRICAL_DIFFUSION_RATE;
+        let (table, _) = load_all();
+        let max_conductivity = table
+            .materials
+            .iter()
+            .map(|m| m.electrical_conductivity)
+            .fold(0.0f32, f32::max);
+        let product = ELECTRICAL_DIFFUSION_RATE * max_conductivity * 6.0;
+        assert!(
+            product < 1.0,
+            "Electrical CFL violated: {} * {} * 6 = {} >= 1.0",
+            ELECTRICAL_DIFFUSION_RATE,
+            max_conductivity,
+            product
         );
     }
 

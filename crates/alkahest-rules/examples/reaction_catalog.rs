@@ -16,6 +16,7 @@ fn main() {
         include_str!("../../../data/materials/metals.ron"),
         include_str!("../../../data/materials/synthetics.ron"),
         include_str!("../../../data/materials/exotic.ron"),
+        include_str!("../../../data/materials/electrical.ron"),
     ])
     .expect("Failed to load materials");
 
@@ -28,6 +29,7 @@ fn main() {
         include_str!("../../../data/rules/biological.ron"),
         include_str!("../../../data/rules/thermal.ron"),
         include_str!("../../../data/rules/synthesis.ron"),
+        include_str!("../../../data/rules/electrical.ron"),
     ])
     .expect("Failed to load rules");
 
@@ -82,6 +84,7 @@ fn main() {
         "Energy",
         "Synthetics",
         "Exotic",
+        "Electrical",
     ];
 
     let mut cat_stats = String::from("[");
@@ -130,7 +133,7 @@ td:hover{{outline:2px solid #fff;z-index:3}}
   pointer-events:none;z-index:100;max-width:350px;box-shadow:0 4px 12px rgba(0,0,0,0.5)}}
 .cat-Legacy{{background:#555}}.cat-Naturals{{background:#5d4e37}}.cat-Metals{{background:#708090}}
 .cat-Organics{{background:#3a5f3a}}.cat-Energy{{background:#8b4513}}.cat-Synthetics{{background:#4a5568}}
-.cat-Exotic{{background:#6b21a8}}
+.cat-Exotic{{background:#6b21a8}}.cat-Electrical{{background:#d4a017}}
 </style>
 </head>
 <body>
@@ -162,7 +165,7 @@ rules.forEach(r=>{{
 
 // Category colors
 const catColors={{Legacy:'#555',Naturals:'#8B7355',Metals:'#A8B2BD',Organics:'#6B8E5A',
-  Energy:'#D4762C',Synthetics:'#7B8A9E',Exotic:'#9B59B6',Air:'#333',Unknown:'#333'}};
+  Energy:'#D4762C',Synthetics:'#7B8A9E',Exotic:'#9B59B6',Electrical:'#D4A017',Air:'#333',Unknown:'#333'}};
 
 // Stats
 const statsEl=document.getElementById('stats');
