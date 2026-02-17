@@ -12,4 +12,4 @@ cargo clippy -p alkahest-bench -- -D warnings
 cargo fmt --all -- --check
 
 # Unit tests run on host for alkahest-core (pure Rust, no web deps)
-cargo test -p alkahest-core
+cargo test --workspace --exclude alkahest-web --exclude alkahest-bench

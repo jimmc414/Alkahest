@@ -41,7 +41,7 @@ pub async fn init_gpu(
         .map_err(|e| AlkahestError::SurfaceConfigFailed(format!("{e}")))?;
     #[cfg(not(target_arch = "wasm32"))]
     let surface: Surface<'static> = {
-        let _ = (&instance, &canvas);
+        let _ = (&instance, &canvas, width, height);
         return Err(AlkahestError::SurfaceConfigFailed(
             "Canvas surface requires wasm32 target".into(),
         ));
