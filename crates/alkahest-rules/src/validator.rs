@@ -519,6 +519,79 @@ mod tests {
     }
 
     #[test]
+    fn test_electrical_conductivity_out_of_range_rejected() {
+        let table = MaterialTable {
+            materials: vec![{
+                let mut m = make_material(0, "BadElecConductor");
+                m.electrical_conductivity = 1.5;
+                m
+            }],
+        };
+        let result = validate_materials(&table);
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors
+            .iter()
+            .any(|e| matches!(e, ValidationError::ElectricalConductivityOutOfRange { .. })));
+
+        // Negative value also rejected
+        let table = MaterialTable {
+            materials: vec![{
+                let mut m = make_material(0, "NegElecConductor");
+                m.electrical_conductivity = -0.1;
+                m
+            }],
+        };
+        let result = validate_materials(&table);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_electrical_resistance_out_of_range_rejected() {
+        let table = MaterialTable {
+            materials: vec![{
+                let mut m = make_material(0, "BadResistance");
+                m.electrical_resistance = 1.5;
+                m
+            }],
+        };
+        let result = validate_materials(&table);
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors
+            .iter()
+            .any(|e| matches!(e, ValidationError::ElectricalResistanceOutOfRange { .. })));
+
+        // Negative value also rejected
+        let table = MaterialTable {
+            materials: vec![{
+                let mut m = make_material(0, "NegResistance");
+                m.electrical_resistance = -0.1;
+                m
+            }],
+        };
+        let result = validate_materials(&table);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_activation_threshold_out_of_range_rejected() {
+        let table = MaterialTable {
+            materials: vec![{
+                let mut m = make_material(0, "BadThreshold");
+                m.activation_threshold = 7;
+                m
+            }],
+        };
+        let result = validate_materials(&table);
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors
+            .iter()
+            .any(|e| matches!(e, ValidationError::ActivationThresholdOutOfRange { .. })));
+    }
+
+    #[test]
     fn test_mod_duplicate_with_base_detected_after_merge() {
         // After merging, if a mod material ID collides with a base ID,
         // validate_materials catches it as DuplicateMaterialId
