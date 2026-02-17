@@ -130,3 +130,21 @@ pub const CHARGE_DECAY_RATE: u32 = 2;
 
 /// Joule heating factor: temp_increase = charge^2 * resistance * JOULE_HEATING_FACTOR.
 pub const JOULE_HEATING_FACTOR: f32 = 0.01;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fundamental_constants() {
+        assert_eq!(CHUNK_SIZE, 32);
+        assert_eq!(VOXELS_PER_CHUNK, 32_768);
+        assert_eq!(BYTES_PER_CHUNK, 262_144);
+    }
+
+    #[test]
+    fn test_electrical_constants() {
+        assert_eq!(CHARGE_MAX, 255);
+        assert_eq!(CHARGE_BYTES_PER_VOXEL, 1);
+    }
+}

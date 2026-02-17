@@ -252,4 +252,65 @@ mod tests {
     fn test_voxel_data_size() {
         assert_eq!(std::mem::size_of::<super::VoxelData>(), 8);
     }
+
+    #[test]
+    fn test_temp_quantization_resolution() {
+        // 12-bit range over 8000K: step size = 8000 / 4095 ≈ 1.953 K
+        let step = TEMP_QUANT_MAX_K / TEMP_QUANT_MAX_VALUE as f32;
+        assert!(step > 1.9 && step < 2.0, "step size {step} should be ~2K");
+
+        // Verify adjacent quantized values differ by approximately one step
+        let t1 = temp_from_quantized(100);
+        let t2 = temp_from_quantized(101);
+        let diff = t2 - t1;
+        assert!(
+            (diff - step).abs() < 0.01,
+            "adjacent step diff {diff} should match step size {step}"
+        );
+    }
+
+    #[test]
+    fn test_temp_roundtrip_systematic() {
+        // Sample temperatures across the full range
+        for &kelvin in &[0.0_f32, 300.0, 1000.0, 4000.0, TEMP_QUANT_MAX_K] {
+            let q = temp_to_quantized(kelvin);
+            let back = temp_from_quantized(q);
+            let max_error = TEMP_QUANT_MAX_K / TEMP_QUANT_MAX_VALUE as f32;
+            assert!(
+                (back - kelvin).abs() <= max_error,
+                "roundtrip failed for {kelvin}K: got {back}K (error {}K, max allowed {max_error}K)",
+                (back - kelvin).abs()
+            );
+        }
+    }
+
+    #[test]
+    fn test_pack_unpack_all_flag_combinations() {
+        // Test each flag bit individually
+        for bit in 0..6u8 {
+            let flags = 1u8 << bit;
+            let voxel = pack_voxel(MaterialId(1), 100, 0, 0, 0, 0, flags);
+            let (_, _, _, _, _, _, fl) = unpack_voxel(voxel);
+            assert_eq!(fl, flags, "single flag bit {bit} failed");
+        }
+        // Test all flags combined
+        let all_flags = 0x3F; // all 6 bits set
+        let voxel = pack_voxel(MaterialId(1), 100, 0, 0, 0, 0, all_flags);
+        let (_, _, _, _, _, _, fl) = unpack_voxel(voxel);
+        assert_eq!(fl, all_flags, "all flags combined failed");
+
+        // Test no flags
+        let voxel = pack_voxel(MaterialId(1), 100, 0, 0, 0, 0, 0);
+        let (_, _, _, _, _, _, fl) = unpack_voxel(voxel);
+        assert_eq!(fl, 0, "zero flags failed");
+    }
+
+    #[test]
+    fn test_pack_unpack_pressure_boundary() {
+        for &pressure in &[0u8, 1, 32, 63] {
+            let voxel = pack_voxel(MaterialId(1), 100, 0, 0, 0, pressure, 0);
+            let (_, _, _, _, _, pr, _) = unpack_voxel(voxel);
+            assert_eq!(pr, pressure, "pressure {pressure} roundtrip failed");
+        }
+    }
 }

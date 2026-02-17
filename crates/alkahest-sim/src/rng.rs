@@ -92,4 +92,22 @@ mod tests {
             assert!(f >= 0.0 && f < 1.0, "out of range: {f}");
         }
     }
+
+    #[test]
+    fn test_prng_same_inputs_same_output() {
+        // Verify determinism across multiple calls with identical inputs
+        let inputs = [
+            (0, 0, 0, 0u32),
+            (-1, -1, -1, 0),
+            (i32::MAX, i32::MIN, 0, u32::MAX),
+            (100, 200, 300, 999),
+        ];
+        for &(x, y, z, tick) in &inputs {
+            let a = sim_hash(x, y, z, tick);
+            let b = sim_hash(x, y, z, tick);
+            let c = sim_hash(x, y, z, tick);
+            assert_eq!(a, b, "determinism failed for ({x},{y},{z},{tick})");
+            assert_eq!(b, c, "determinism failed for ({x},{y},{z},{tick})");
+        }
+    }
 }

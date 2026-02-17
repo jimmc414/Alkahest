@@ -222,4 +222,72 @@ mod tests {
         let result = detect_collapse(&chunk, &[1]);
         assert!(result.is_empty());
     }
+
+    #[test]
+    fn test_l_shaped_connected() {
+        // L-shape touching y=0: vertical arm y=0..3 at x=5, horizontal arm x=5..8 at y=0
+        let mut chunk = empty_chunk();
+        // Vertical arm
+        for y in 0..4 {
+            set_material(&mut chunk, 5, y, 5, 1);
+        }
+        // Horizontal arm on ground
+        for x in 6..9 {
+            set_material(&mut chunk, x, 0, 5, 1);
+        }
+
+        let result = detect_collapse(&chunk, &[1]);
+        assert!(
+            result.is_empty(),
+            "L-shape touching y=0 should be fully connected, got {} disconnected",
+            result.len()
+        );
+    }
+
+    #[test]
+    fn test_multiple_disconnected_components() {
+        // Two separate floating blocks, neither touching ground
+        let mut chunk = empty_chunk();
+        // Block A: at y=10
+        for x in 2..4 {
+            for z in 2..4 {
+                set_material(&mut chunk, x, 10, z, 1);
+            }
+        }
+        // Block B: at y=20
+        for x in 20..22 {
+            for z in 20..22 {
+                set_material(&mut chunk, x, 20, z, 1);
+            }
+        }
+
+        let result = detect_collapse(&chunk, &[1]);
+        assert_eq!(
+            result.len(),
+            8,
+            "two 2x1x2 floating blocks = 8 disconnected voxels, got {}",
+            result.len()
+        );
+    }
+
+    #[test]
+    fn test_multiple_structural_ids() {
+        // Both Stone (1) and Brick (3) are structural; they should connect
+        let mut chunk = empty_chunk();
+        // Stone on ground
+        set_material(&mut chunk, 5, 0, 5, 1);
+        // Brick on top of stone
+        set_material(&mut chunk, 5, 1, 5, 3);
+        // Brick floating separately
+        set_material(&mut chunk, 20, 15, 20, 3);
+
+        let result = detect_collapse(&chunk, &[1, 3]);
+        // The stone+brick column is grounded, so only the floating brick is disconnected
+        assert_eq!(
+            result.len(),
+            1,
+            "only the floating brick should be disconnected, got {}",
+            result.len()
+        );
+    }
 }
