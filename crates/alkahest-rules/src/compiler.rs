@@ -21,7 +21,7 @@ pub struct CompiledMaterialColor {
 
 /// Compiled GPU rule data ready for upload. Created once at init (C-PERF-2).
 pub struct GpuRuleData {
-    /// Material properties buffer: 48 bytes (3x vec4<f32>) per material.
+    /// Material properties buffer: 64 bytes (4x vec4<f32>) per material.
     pub material_props_buffer: wgpu::Buffer,
     /// Flat 2D lookup: `rule_lookup[a * material_count + b]` = rule index or NO_RULE.
     pub rule_lookup_buffer: wgpu::Buffer,
@@ -37,12 +37,13 @@ pub struct GpuRuleData {
     pub rule_hash: u64,
 }
 
-/// GPU material property layout: 3x vec4<f32> = 48 bytes per material.
+/// GPU material property layout: 4x vec4<f32> = 64 bytes per material.
 ///
 /// ```text
 /// vec4<f32>[0]: density, phase, flammability, ignition_temp_quantized
 /// vec4<f32>[1]: decay_rate, decay_threshold, decay_product_id, viscosity
 /// vec4<f32>[2]: thermal_conductivity, phase_change_temp_quantized, phase_change_product_id, structural_integrity
+/// vec4<f32>[3]: electrical_conductivity, electrical_resistance, activation_threshold, charge_emission
 /// ```
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -59,23 +60,27 @@ struct GpuMaterialProps {
     phase_change_temp_quantized: f32,
     phase_change_product_id: f32,
     structural_integrity: f32,
+    electrical_conductivity: f32,
+    electrical_resistance: f32,
+    activation_threshold: f32,
+    charge_emission: f32,
 }
 
 /// GPU rule data layout: 2x vec4<u32> = 32 bytes per rule entry.
 ///
 /// ```text
-/// vec4<u32>[0]: input_a_becomes, pressure_delta (bitcast i32), _unused, probability_u32
-/// vec4<u32>[1]: temp_delta_i32, _unused, min_temp, max_temp
+/// vec4<u32>[0]: input_a_becomes, pressure_delta (bitcast i32), min_charge, probability_u32
+/// vec4<u32>[1]: temp_delta_i32, max_charge, min_temp, max_temp
 /// ```
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct GpuRuleEntry {
     input_a_becomes: u32,
     pressure_delta: i32,
-    _unused1: u32,
+    min_charge: u32,
     probability_u32: u32,
     temp_delta: i32,
-    _unused2: u32,
+    max_charge: u32,
     min_temp: u32,
     max_temp: u32,
 }
@@ -105,6 +110,10 @@ pub fn compute_rule_hash(materials: &MaterialTable, rules: &RuleSet) -> u64 {
         mat.phase_change_temp.to_bits().hash(&mut hasher);
         mat.phase_change_product.hash(&mut hasher);
         mat.structural_integrity.to_bits().hash(&mut hasher);
+        mat.electrical_conductivity.to_bits().hash(&mut hasher);
+        mat.electrical_resistance.to_bits().hash(&mut hasher);
+        mat.activation_threshold.hash(&mut hasher);
+        mat.charge_emission.hash(&mut hasher);
     }
 
     // Sort rules by (input_a, input_b) for determinism
@@ -121,6 +130,8 @@ pub fn compute_rule_hash(materials: &MaterialTable, rules: &RuleSet) -> u64 {
         rule.min_temp.hash(&mut hasher);
         rule.max_temp.hash(&mut hasher);
         rule.pressure_delta.hash(&mut hasher);
+        rule.min_charge.hash(&mut hasher);
+        rule.max_charge.hash(&mut hasher);
     }
 
     hasher.finish()
@@ -145,6 +156,10 @@ pub fn compile(device: &wgpu::Device, materials: &MaterialTable, rules: &RuleSet
             phase_change_temp_quantized: 0.0,
             phase_change_product_id: 0.0,
             structural_integrity: 0.0,
+            electrical_conductivity: 0.0,
+            electrical_resistance: 0.0,
+            activation_threshold: 0.0,
+            charge_emission: 0.0,
         };
         material_count as usize
     ];
@@ -165,6 +180,10 @@ pub fn compile(device: &wgpu::Device, materials: &MaterialTable, rules: &RuleSet
                 phase_change_temp_quantized: temp_to_quantized(mat.phase_change_temp) as f32,
                 phase_change_product_id: mat.phase_change_product as f32,
                 structural_integrity: mat.structural_integrity,
+                electrical_conductivity: mat.electrical_conductivity,
+                electrical_resistance: mat.electrical_resistance,
+                activation_threshold: mat.activation_threshold as f32,
+                charge_emission: mat.charge_emission as f32,
             };
         }
     }
@@ -197,10 +216,10 @@ pub fn compile(device: &wgpu::Device, materials: &MaterialTable, rules: &RuleSet
         rule_entries.push(GpuRuleEntry {
             input_a_becomes: rule.output_a as u32,
             pressure_delta: rule.pressure_delta,
-            _unused1: 0,
+            min_charge: rule.min_charge,
             probability_u32,
             temp_delta: rule.temp_delta,
-            _unused2: 0,
+            max_charge: rule.max_charge,
             min_temp: rule.min_temp,
             max_temp: rule.max_temp,
         });
@@ -211,10 +230,10 @@ pub fn compile(device: &wgpu::Device, materials: &MaterialTable, rules: &RuleSet
         rule_entries.push(GpuRuleEntry {
             input_a_becomes: rule.output_b as u32,
             pressure_delta: rule.pressure_delta,
-            _unused1: 0,
+            min_charge: rule.min_charge,
             probability_u32,
             temp_delta: rule.temp_delta,
-            _unused2: 0,
+            max_charge: rule.max_charge,
             min_temp: rule.min_temp,
             max_temp: rule.max_temp,
         });
@@ -235,10 +254,10 @@ pub fn compile(device: &wgpu::Device, materials: &MaterialTable, rules: &RuleSet
         rule_entries.push(GpuRuleEntry {
             input_a_becomes: 0,
             pressure_delta: 0,
-            _unused1: 0,
+            min_charge: 0,
             probability_u32: 0,
             temp_delta: 0,
-            _unused2: 0,
+            max_charge: 0,
             min_temp: 0,
             max_temp: 0,
         });
