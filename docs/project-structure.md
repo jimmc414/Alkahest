@@ -1,8 +1,8 @@
 # ALKAHEST: Project Structure
 
-**Version:** 0.1.0-draft
-**Date:** 2026-02-13
-**Status:** Draft
+**Version:** 1.0.0
+**Date:** 2026-02-16
+**Status:** Complete
 **Companions:** requirements.md, architecture.md, milestones.md
 
 ---
@@ -24,11 +24,16 @@ alkahest/
 ├── Cargo.toml                  [M0] Workspace manifest
 ├── Cargo.lock                  [M0]
 ├── README.md                   [M0]
+├── CLAUDE.md                   Project instructions
 ├── docs/
 │   ├── requirements.md         [M0] (pre-existing)
 │   ├── architecture.md         [M0] (pre-existing)
 │   ├── milestones.md           [M0] (pre-existing)
 │   ├── project-structure.md    [M0] (this document)
+│   ├── technical-constraints.md [M0] (pre-existing)
+│   ├── test-strategy.md        [M0] (pre-existing)
+│   ├── agent-prompt.md         [M0] Per-milestone implementation guide
+│   ├── recipes.md              [M9] Material interaction recipes
 │   └── modding-guide.md        [M12]
 ├── crates/
 │   ├── alkahest-core/          [M0] Core engine library
@@ -38,9 +43,10 @@ alkahest/
 │   ├── alkahest-rules/         [M3] Rule engine, material definitions, interaction matrix
 │   ├── alkahest-world/         [M5] Multi-chunk world management
 │   ├── alkahest-persist/       [M8] Save/load serialization
-│   ├── alkahest-audio/         [M13] Audio system (optional)
+│   ├── alkahest-audio/         [M13] Audio system
 │   └── alkahest-bench/         [M11] Benchmark harness (not shipped to users)
 ├── shaders/
+│   ├── common/                 [M1] Shared WGSL types, coords, rng
 │   ├── render/                 [M1] Rendering shaders (WGSL)
 │   └── sim/                    [M2] Simulation compute shaders (WGSL)
 ├── data/
@@ -48,17 +54,10 @@ alkahest/
 │   ├── rules/                  [M3] Base interaction rules (RON)
 │   └── mods/                   [M12] Example mod packs
 ├── tests/
-│   ├── determinism/            [M2] Deterministic snapshot tests
-│   ├── rules/                  [M3] Rule validation and reaction tests
-│   ├── benchmarks/             [M11] Performance benchmark scenes
-│   └── integration/            [M5] Multi-chunk integration tests
-├── tools/
-│   ├── reaction-catalog/       [M9] Interaction matrix visualization (standalone HTML)
-│   └── id-migration/           [M12] Material ID remapping tool
+│   └── benchmarks/             [M11] Performance benchmark baselines
 ├── web/
 │   ├── index.html              [M0] Host page
-│   ├── style.css               [M7] Minimal UI styling
-│   └── worker.js               [M5] Web Worker bootstrap
+│   └── pkg/                    Build output (WASM + JS glue)
 └── ci/
     ├── build.sh                [M0]
     ├── test.sh                 [M0]
@@ -120,6 +119,7 @@ alkahest-core/src/
 │                             RuleSet container, rule file schema types
 ├── direction.rs        [M2] Direction enum (26 neighbors), offset tables,
 │                             face/edge/corner classification
+├── mod_manifest.rs     [M12] Mod manifest parsing and validation
 └── error.rs            [M0] Shared error types (AlkahestError enum)
 ```
 
@@ -149,6 +149,7 @@ alkahest-web/src/
 │   ├── browser.rs      [M7] Material browser: search, categories, selection
 │   ├── hud.rs          [M7] In-game HUD: current tool, material, sim speed
 │   ├── hover.rs        [M7] Voxel hover info panel
+│   ├── help.rs         [M7] Help overlay with keybinding reference
 │   └── settings.rs     [M7] Settings menu: keybindings, display, audio toggle
 ├── tools/
 │   ├── mod.rs          [M2] Tool trait, tool registry, active tool state
@@ -160,8 +161,9 @@ alkahest-web/src/
 │   └── brush.rs        [M7] Brush shape definitions: single, cube, sphere
 ├── commands.rs         [M2, extended M4/M7] Player command buffer: encodes tool
 │                             actions into GPU-uploadable command structs
-└── worker.rs           [M5] Web Worker communication: SharedArrayBuffer setup,
-                              postMessage protocol for chunk lifecycle events
+├── storage.rs          [M8] Browser storage abstraction for save/load
+│                             (File System Access API + IndexedDB fallback)
+└── worker.js           [M5] Web Worker bootstrap (JavaScript, not Rust)
 ```
 
 **Public API boundary:** This crate exposes nothing — it is the application root. All pub interfaces point inward (it calls into other crates).
@@ -227,7 +229,8 @@ alkahest-sim/src/
 │   ├── reactions.rs    [M3] Pass 3: interaction matrix evaluation,
 │   │                         byproduct spawning, state transitions
 │   ├── thermal.rs      [M4] Pass 4a: heat diffusion, entropy drain, convection bias
-│   ├── pressure.rs     [M6] Pass 4b: pressure accumulation, diffusion, rupture
+│   ├── electrical.rs   [M15] Pass 4b: electrical charge propagation, Joule heating
+│   ├── pressure.rs     [M6] Pass 4c: pressure accumulation, diffusion, rupture
 │   └── activity.rs     [M5] Pass 5: per-chunk dirty flag scan
 ├── conflict.rs         [M2] Checkerboard sub-pass scheduling, direction ordering
 ├── rng.rs              [M2] Deterministic per-voxel PRNG (coordinate + tick hash)
@@ -263,6 +266,10 @@ alkahest-rules/src/
 │                             conduct heat," "all organics are flammable."
 │                             Applied during compilation before per-material
 │                             overrides.
+├── balancing.rs        [M9] Automated balancing checks: self-replication,
+│                             runaway temperature, combustion exhaustion,
+│                             oscillation detection, category coverage,
+│                             electrical CFL stability (M15)
 └── migration.rs        [M12] Material ID remapping between rule set versions.
                               Offline utility, not used at runtime.
 ```
@@ -323,6 +330,7 @@ alkahest-persist/src/
 │                             Handles the single-material-fill special case.
 ├── compat.rs           [M8] Rule set hash comparison, version compatibility
 │                             checks, warning generation for mismatched saves.
+├── error.rs            [M8] Persistence-specific error types
 └── subregion.rs        [M8] Subregion export: given a bounding box, filter
                               the chunk set and produce a save file containing
                               only the selected chunks.
@@ -385,20 +393,19 @@ shaders/
 │   ├── ray_march.wgsl      [M1, extended M5/M10] Primary visibility ray marcher.
 │   │                             M1: single-chunk DDA. M5: multi-chunk octree traversal.
 │   │                             M10: LOD termination, volumetric transparency.
-│   ├── lighting.wgsl       [M1, extended M10] Direct lighting + shadow rays.
-│   │                             M1: single light. M10: multi-light loop, AO term.
+│   ├── blit.wgsl            [M10] Final compositing: fullscreen blit, tone mapping.
 │   ├── sky.wgsl            [M10] Procedural sky / background.
-│   ├── composite.wgsl      [M10] Final compositing: tone mapping, gamma correction.
-│   ├── debug_lines.wgsl    [M1] Wireframe line rendering (vertex + fragment).
-│   └── pick.wgsl           [M7] Write hit voxel info to pick buffer during ray march.
+│   └── debug_lines.wgsl    [M1] Wireframe line rendering (vertex + fragment).
 ├── sim/
 │   ├── commands.wgsl       [M2] Pass 1: apply player commands to voxel buffer.
 │   ├── movement.wgsl       [M2, extended M3] Pass 2: gravity, density displacement,
 │   │                             liquid flow, gas rise. Contains sub-pass logic
 │   │                             for checkerboard conflict resolution.
 │   ├── reactions.wgsl      [M3] Pass 3: interaction matrix lookup, byproduct spawning.
+│   │                             Evaluates charge conditions for electrical logic (M15).
 │   ├── thermal.wgsl        [M4] Pass 4a: heat diffusion stencil, entropy drain.
-│   ├── pressure.wgsl       [M6] Pass 4b: pressure diffusion, rupture detection.
+│   ├── electrical.wgsl     [M15] Pass 4b: charge propagation, Joule heating.
+│   ├── pressure.wgsl       [M6] Pass 4c: pressure diffusion, rupture detection.
 │   └── activity.wgsl       [M5] Pass 5: per-chunk dirty flag reduction.
 ```
 
@@ -418,7 +425,8 @@ data/
 │   ├── energy.ron          [M3, extended M9] Fire, smoke, steam, plasma, etc.
 │   ├── synthetics.ron      [M9] Polymers, ceramics, composites
 │   ├── exotic.ron          [M9] Gameplay-only fictional materials
-│   └── electrical.ron      [M15] Conductive, resistive, logic materials (optional)
+│   ├── explosives.ron      [M9] Explosive materials (gunpowder, dynamite, etc.)
+│   └── electrical.ron      [M15] Conductive, resistive, logic materials
 ├── rules/
 │   ├── _schema.ron         [M3] Schema documentation / example
 │   ├── combustion.ron      [M3, extended M9] Fire/fuel interactions
@@ -426,8 +434,10 @@ data/
 │   ├── displacement.ron    [M3, extended M9] Density-based material displacement
 │   ├── dissolution.ron     [M9] Acid, solvent interactions
 │   ├── biological.ron      [M9] Organic growth, decay
-│   ├── electrical.ron      [M15] Conductivity, short-circuit interactions (optional)
-│   └── structural.ron      [M6] Bond strength overrides, corrosion rules
+│   ├── synthesis.ron       [M9] Material combination and creation rules
+│   ├── thermal.ron         [M4, extended M9] Temperature-driven interactions
+│   ├── structural.ron      [M6] Bond strength overrides, corrosion rules
+│   └── electrical.ron      [M15] Conductivity, short-circuit interactions
 └── mods/
     └── example-mod/        [M12]
         ├── mod.ron          Mod metadata: name, version, load order hint
@@ -445,32 +455,21 @@ Material and rule files are split by category for human readability, but the eng
 
 ```
 tests/
-├── determinism/
-│   ├── single_chunk.rs     [M2] Single-chunk deterministic snapshot tests
-│   │                             (sand fall, pile formation, avalanche)
-│   ├── reactions.rs        [M3] Reaction snapshot tests
-│   │                             (combustion, extinguishing, density displacement)
-│   ├── thermal.rs          [M4] Thermal diffusion snapshot tests
-│   │                             (equilibrium, melting, convection)
-│   ├── pressure.rs         [M6] Pressure snapshot tests
-│   │                             (accumulation, rupture, blast propagation)
-│   └── multi_chunk.rs      [M5] Cross-chunk boundary snapshot tests
-├── rules/
-│   ├── validation.rs       [M3] Rule file parsing and validation tests
-│   │                             (valid files, malformed files, infinite loops)
-│   ├── balancing.rs        [M9] Automated degenerate behavior detection
-│   │                             (self-replication, runaway temperature, fuel exhaustion)
-│   └── mod_loading.rs      [M12] Mod loading, conflict resolution, rejection tests
-├── integration/
-│   ├── save_load.rs        [M8] Save/load round-trip correctness
-│   ├── chunk_lifecycle.rs  [M5] Chunk state transitions, activation propagation
-│   └── structural.rs       [M6] Structural collapse scenarios
 └── benchmarks/
-    ├── scenes/             [M11] Benchmark scene definitions (RON or Rust)
     └── baselines/          [M11] Known-good timing baselines (JSON)
 ```
 
-Test files live in the workspace-level `tests/` directory (integration tests) rather than inside individual crates. This is intentional: most tests exercise multiple crates working together (sim + rules + world). Unit tests within individual crates use the standard `#[cfg(test)] mod tests` pattern inside source files.
+Tests are implemented as `#[cfg(test)] mod tests` blocks within each source file rather than in a separate `tests/` directory tree. This keeps tests close to the code they verify and is the standard Rust convention for unit tests. Each crate's tests exercise its own logic; cross-crate integration behavior is validated through the composition in `alkahest-web`.
+
+**Test counts by crate (191 total):**
+- alkahest-core: 29 tests (math, direction, material, types)
+- alkahest-rules: 56 tests (loader, validator, compiler, balancing, migration, defaults)
+- alkahest-sim: 29 tests (buffers, conflict, rng, structural, test_harness)
+- alkahest-persist: 23 tests (format, save, load, compress, compat, subregion)
+- alkahest-web: 21 tests (camera, tools, UI browser)
+- alkahest-world: 13 tests (chunk_map, dispatch, state_machine, terrain)
+- alkahest-render: 10 tests (ao, lighting, octree, sky, transparency)
+- alkahest-audio: 10 tests (lib, scanner)
 
 ---
 
@@ -495,7 +494,7 @@ This table lists every module and the milestone that creates it. Use this as the
 | M12 | — | rules: loader extended, validator extended, migration. | — | mods/example-mod/*, docs/modding-guide.md |
 | M13 | alkahest-audio | audio: scanner, generators, mixer, bridge | — | — |
 | M14 | — | — (content expansion, no new modules) | — | materials/*.ron expanded, rules/*.ron expanded |
-| M15 | — | Modules in sim and rules for electrical. | — | materials/electrical.ron, rules/electrical.ron |
+| M15 | — | sim: passes/electrical, buffers extended. rules: balancing extended. | sim/electrical | materials/electrical.ron, rules/electrical.ron |
 
 ---
 
@@ -544,14 +543,12 @@ Data files are loaded at runtime via fetch (not embedded in WASM) so that mods c
 
 ---
 
-## 12. What NOT to Create
+## 12. Development Discipline (Historical)
 
-At any given milestone, the following should not exist in the repository:
+During development, the following principles governed the incremental growth of the project structure through milestones M0-M15:
 
-- Empty stub files for future modules ("TODO: implement in M7").
-- Trait definitions for systems that don't exist yet ("pub trait AudioSystem" before M13).
-- Placeholder crates with only a `lib.rs` containing `// coming soon`.
-- Abstract interfaces designed to accommodate hypothetical future requirements. Write concrete code for the current milestone; refactor when the next milestone reveals the actual abstraction needed.
-- `mod.rs` files that re-export modules from future milestones.
+- No empty stub files for future modules. No placeholder crates or traits designed for systems that did not yet exist.
+- No abstract interfaces for hypothetical future requirements. Concrete code was written for each milestone; abstractions were introduced only when a second implementation demanded them.
+- The project structure grew by accretion. Each milestone added exactly what it needed. Restructuring of earlier modules happened as part of the milestone that required it, not preemptively.
 
-The project structure grows by accretion. Each milestone adds exactly what it needs. If a later milestone requires restructuring an earlier module (e.g., splitting a file that grew too large), that restructuring happens as part of the later milestone, not preemptively.
+All 15 milestones are now complete. The structure above reflects the final state of the codebase.

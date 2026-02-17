@@ -1,8 +1,8 @@
 # ALKAHEST: Technical Constraints
 
-**Version:** 0.1.0-draft
-**Date:** 2026-02-13
-**Status:** Draft
+**Version:** 1.0.0
+**Date:** 2026-02-16
+**Status:** Complete
 **Companions:** requirements.md, architecture.md, milestones.md, project-structure.md
 
 ---
@@ -356,4 +356,4 @@ This index lists which constraints are relevant at each milestone. Read the list
 
 **M14 (500+ Materials):** C-RUST-8 (re-evaluate parse time), C-GPU-3 (re-evaluate buffer limits)
 
-**M15 (Electrical):** C-DATA-4 (voxel bit layout may need expansion)
+**M15 (Electrical):** C-GPU-3 (resolved: electrical pass uses a separate bind group at @group(1) to avoid exceeding the 8-binding limit), C-DATA-4 (resolved: charge is stored in a separate 128 KB/chunk buffer rather than expanding the 8-byte voxel layout), C-SIM-5 (extended: electrical CFL stability validated alongside thermal)

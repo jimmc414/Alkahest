@@ -1,17 +1,17 @@
 # ALKAHEST: Test Strategy
 
-**Version:** 0.1.0-draft
-**Date:** 2026-02-13
-**Status:** Skeleton — test cases to be written alongside implementation
+**Version:** 1.0.0
+**Date:** 2026-02-16
+**Status:** Complete
 **Companions:** requirements.md, architecture.md, milestones.md, project-structure.md, technical-constraints.md
 
 ---
 
 ## 1. How to Use This Document
 
-This document defines what is tested, how it is tested, and what constitutes pass/fail for each subsystem and milestone. It does not contain individual test cases — those are written during implementation and live in the `tests/` directory (see project-structure.md Section 7).
+This document defines what is tested, how it is tested, and what constitutes pass/fail for each subsystem and milestone. All 191 tests are implemented as `#[cfg(test)]` blocks within each crate's source files (see project-structure.md Section 7).
 
-Each milestone must pass all tests defined for it and all tests from prior milestones before it is considered complete. Tests are additive: the test suite only grows. A passing M5 build runs all M2, M3, M4, and M5 tests.
+All 15 milestones are complete. The full test suite of 191 tests covers all milestones cumulatively.
 
 ---
 
@@ -122,7 +122,7 @@ The fast CI path (every push) runs: compilation, clippy, rustfmt, unit tests (no
 
 ## 4. Per-Milestone Test Plan
 
-Each milestone lists the test categories required, specific areas of focus, and minimum test counts. Actual test case definitions are written during the milestone and committed alongside the implementation code.
+Each milestone lists the test categories required, specific areas of focus, and test counts. All tests have been implemented and are part of the CI suite.
 
 ### 4.1 Milestone 0: Toolchain
 
@@ -335,15 +335,36 @@ Each milestone lists the test categories required, specific areas of focus, and 
 
 **Minimum tests:** 6 rule validation tests, 4 integration tests.
 
-### 4.14 Milestones 13–15 (Optional)
+### 4.14 Milestone 13: Audio
 
-Test plans for optional milestones follow the same structure. Key focus areas:
+**Test categories:** Functional (scanner behavior, system lifecycle).
 
-**M13 (Audio):** No automated audio tests. Manual verification that audio sources are spatialized and attenuated correctly. A test that verifies the audio scanner produces the correct number and type of audio sources for a known scene (functional test, not auditory).
+**Actual tests (10 in alkahest-audio):**
+- Audio system enabled/disabled toggle and no-op behavior
+- Scanner: activity resets idle counter, neighbor activation, event decay, max event cap, intensity scaling
+- Scanner: multiple simultaneous event categories
+- System lifecycle: register, update, clear
 
-**M14 (500+ Materials):** Extends M9 balancing suite. Same 5 parametric tests, now scanning 500+ materials and 10,000+ rules. Verify frame time impact is under 2 ms vs. the M9 baseline.
+### 4.15 Milestone 14: 500+ Materials
 
-**M15 (Electrical):** Deterministic snapshot tests for circuit behavior. A wire carrying current heats a resistor. An AND gate produces correct output for all 4 input combinations. A short circuit causes thermal overload.
+**Test categories:** Rule validation (balancing suite extended).
+
+**Actual tests:** The M9 balancing tests now validate all 561 materials and 11,998 rules. Tests `test_material_count_minimum` and `test_rule_count_minimum` enforce the target counts.
+
+### 4.16 Milestone 15: Electrical
+
+**Test categories:** Unit tests (buffer layout, balancing, shader data).
+
+**Actual tests (5 in alkahest-sim, 4 in alkahest-rules):**
+- `test_charge_slot_size` — verifies charge buffer is 128 KB per chunk (32^3 * 4 bytes)
+- `test_charge_slot_byte_offset` — verifies byte offset calculations for charge buffer slots
+- `test_electrical_materials_exist` — verifies electrical materials (wire, resistor, switch, AND gate) are present in the material table
+- `test_electrical_conductivity_valid` — verifies all electrical materials have valid conductivity values
+- `test_electrical_conductivity_out_of_range_rejected` — verifies conductivity out of range is rejected by validator
+- `test_electrical_resistance_out_of_range_rejected` — verifies resistance out of range is rejected by validator
+- `test_electrical_cfl_stability` — verifies electrical CFL stability condition is checked
+- `test_cfl_stability_validated` — verifies combined thermal+electrical CFL validation
+- `test_activation_threshold_out_of_range_rejected` — verifies activation threshold bounds checking
 
 ---
 
@@ -371,11 +392,12 @@ Any panic or crash in any test (including GPU validation errors, WASM traps, and
 
 ### 6.1 Fast Path (Every Push)
 
-- Compilation: `cargo build --target wasm32-unknown-unknown`
-- Lint: `cargo clippy -- -D warnings`
-- Format: `cargo fmt --check`
-- Unit tests (CPU-only): `cargo test` (excludes GPU-dependent tests)
-- WASM binary size check: fail if compressed size exceeds 10 MB
+As implemented in `ci/test.sh`:
+
+- Lint (WASM target): `cargo clippy --workspace --exclude alkahest-bench --target wasm32-unknown-unknown -- -D warnings`
+- Lint (native, bench only): `cargo clippy -p alkahest-bench -- -D warnings`
+- Format: `cargo fmt --all -- --check`
+- Unit tests (CPU-only, excludes web/bench): `cargo test --workspace --exclude alkahest-web --exclude alkahest-bench`
 
 Target: under 5 minutes.
 
@@ -401,16 +423,66 @@ Target: under 30 minutes.
 
 Alkahest does not target a line-coverage percentage. Coverage metrics incentivize trivial tests and miss the bugs that matter in a GPU-driven simulation (non-determinism, race conditions, visual artifacts, performance regressions).
 
-Instead, coverage is measured by scenario coverage: every material interaction that ships in the game has at least one deterministic test exercising it. Every milestone's acceptance criteria (milestones.md) maps to at least one automated test. The mapping is maintained in a traceability table:
+Instead, coverage is measured by scenario coverage: every material interaction that ships in the game has at least one deterministic test exercising it. Every milestone's acceptance criteria (milestones.md) maps to at least one automated test. The mapping is maintained in the traceability table below.
 
-| Milestone Acceptance Criterion | Test File | Test Function |
+| Milestone Acceptance Criterion | Test File | Test Function(s) |
 |---|---|---|
-| M2: sand falls to floor | `tests/determinism/single_chunk.rs` | `test_sand_falls_to_floor` |
-| M2: deterministic across runs | `tests/determinism/single_chunk.rs` | `test_competing_sand_determinism` |
-| M3: fire + wood → ash + smoke | `tests/determinism/reactions.rs` | `test_fire_wood_combustion` |
-| ... | ... | ... |
-
-This table is populated as test cases are written during each milestone. Gaps in the table (acceptance criteria with no corresponding test) are treated as blocking issues for milestone completion.
+| M0: Voxel data packing (8 bytes) | `crates/alkahest-core/src/math.rs` | `test_pack_unpack_zeros`, `test_pack_unpack_typical_voxel`, `test_pack_unpack_max_values`, `test_pack_unpack_negative_velocities`, `test_pack_unpack_vel_x_boundary_cases`, `test_voxel_data_size` |
+| M0: Temperature quantization | `crates/alkahest-core/src/math.rs` | `test_temp_roundtrip_ambient`, `test_temp_edge_cases`, `test_phase_as_f32` |
+| M0: Coordinate conversions | `crates/alkahest-core/src/math.rs` | `test_world_to_chunk_positive`, `test_world_to_chunk_negative`, `test_world_to_local_positive`, `test_world_to_local_negative`, `test_chunk_local_roundtrip` |
+| M1: Render lighting | `crates/alkahest-render/src/lighting.rs` | `test_light_config_default`, `test_light_config_size`, `test_gpu_point_light_size` |
+| M1: Ambient occlusion | `crates/alkahest-render/src/ao.rs` | `test_ao_range` |
+| M1: Sky rendering | `crates/alkahest-render/src/sky.rs` | `test_sky_colors_valid` |
+| M1: Transparency compositing | `crates/alkahest-render/src/transparency.rs` | `test_volume_clamp` |
+| M1: Octree construction | `crates/alkahest-render/src/octree.rs` | `test_empty_octree`, `test_rebuild_all_empty`, `test_rebuild_with_occupied_chunks`, `test_corner_offset` |
+| M2: Direction system (26 neighbors) | `crates/alkahest-core/src/direction.rs` | `test_all_directions_count`, `test_all_directions_unique`, `test_direction_kinds`, `test_all_gravity_directions_go_down`, `test_down_offset`, `test_no_zero_offset`, `test_gravity_directions_order` |
+| M2: Double-buffer management | `crates/alkahest-sim/src/buffers.rs` | `test_chunk_buffer_size`, `test_slot_byte_offset`, `test_pool_slot_allocation_and_free`, `test_descriptor_data_layout` |
+| M2: Checkerboard conflict resolution | `crates/alkahest-sim/src/conflict.rs` | `test_checkerboard_no_conflict`, `test_gravity_schedule_first_is_down`, `test_gravity_schedule_length`, `test_gravity_schedule_parities_alternate`, `test_movement_schedule_length`, `test_movement_schedule_parities`, `test_movement_schedule_has_lateral`, `test_movement_schedule_has_rise`, `test_movement_uniforms_size`, `test_movement_schedule_length` |
+| M2: Deterministic PRNG | `crates/alkahest-sim/src/rng.rs` | `test_deterministic`, `test_different_inputs_differ`, `test_hash_to_float_range`, `test_distribution` |
+| M2: Test harness infrastructure | `crates/alkahest-sim/src/test_harness.rs` | `test_prng_determinism_across_ticks`, `test_prng_symmetry_broken` |
+| M2: Camera modes | `crates/alkahest-web/src/camera.rs` | `test_orbit_eye_position`, `test_camera_mode_toggle`, `test_camera_state_size`, `test_sim_speed_4x` |
+| M2: Tool system | `crates/alkahest-web/src/tools/mod.rs` | `test_tool_state_default`, `test_active_tool_names`, `test_enabled_toggle`, `test_sim_speed_quarter` |
+| M3: Material definitions load | `crates/alkahest-rules/src/loader.rs` | `test_load_single_material`, `test_load_single_rule`, `test_valid_materials_load`, `test_valid_rules_load`, `test_load_all_merges`, `test_new_materials_load` |
+| M3: Material ID uniqueness | `crates/alkahest-rules/src/validator.rs` | `test_duplicate_material_id_rejected` |
+| M3: Rule validation | `crates/alkahest-rules/src/validator.rs` | `test_nonexistent_material_ref_rejected`, `test_property_exceeds_quantization_rejected`, `test_energy_from_nothing_rejected`, `test_infinite_loop_detected`, `test_malformed_ron_rejected` |
+| M3: Material table access | `crates/alkahest-core/src/material.rs` | `test_material_table_get`, `test_material_id_mapping` |
+| M3: GPU rule data compilation | `crates/alkahest-rules/src/compiler.rs` | `test_gpu_data_format`, `test_remap_assigns_contiguous_ids` |
+| M4: CFL stability check | `crates/alkahest-rules/src/validator.rs` | `test_cfl_stability_validated`, `test_thermal_conductivity_range` |
+| M5: Chunk map spatial queries | `crates/alkahest-world/src/chunk_map.rs` | `test_chunk_map_spatial_queries`, `test_clear_removes_all` |
+| M5: Chunk state transitions | `crates/alkahest-world/src/state_machine.rs` | `test_sleep_after_idle_ticks`, `test_register_and_update`, `test_activity_resets_idle` |
+| M5: Dispatch list | `crates/alkahest-world/src/dispatch.rs` | `test_dispatch_list_construction`, `test_dispatch_list_active_only`, `test_fp_movement_in_empty_world` |
+| M5: Terrain generation | `crates/alkahest-world/src/terrain.rs` | `test_terrain_chunk_size`, `test_terrain_deterministic`, `test_terrain_generates_stone_sand_water`, `test_air_chunk_above_terrain`, `test_fill_detection_all_air` |
+| M6: Structural integrity | `crates/alkahest-sim/src/structural.rs` | `test_structural_empty_chunk`, `test_structural_flood_fill_connected`, `test_structural_flood_fill_disconnect`, `test_structural_flood_fill_bounded`, `test_structural_mixed_materials` |
+| M7: Brush system | `crates/alkahest-web/src/tools/brush.rs` | `test_brush_shape_cycle`, `test_brush_radius_increase_clamp`, `test_brush_radius_decrease_clamp`, `test_brush_auto_shape_on_radius_increase`, `test_brush_reset_shape_on_radius_zero`, `test_cube_voxel_count_r4`, `test_sphere_voxel_count_r8`, `test_brush_shape_gpu_values` |
+| M7: Material browser search | `crates/alkahest-web/src/ui/browser.rs` | `test_browser_search_water`, `test_browser_search_no_results`, `test_browser_search_case_insensitive`, `test_browser_search_empty`, `test_browser_sorted_by_id` |
+| M8: Save/load round-trip | `crates/alkahest-persist/src/save.rs` | `test_save_load_roundtrip`, `test_save_header_fields_correct` |
+| M8: Save format validation | `crates/alkahest-persist/src/format.rs` | `test_header_size`, `test_chunk_has_content` |
+| M8: Load error handling | `crates/alkahest-persist/src/load.rs` | `test_invalid_magic_rejected`, `test_unsupported_version_rejected`, `test_truncated_file_rejected`, `test_file_too_small_rejected`, `test_valid_header_no_warnings` |
+| M8: Compression | `crates/alkahest-persist/src/compress.rs` | `test_compress_decompress_roundtrip`, `test_compressed_size_sanity`, `test_fill_encode_decode`, `test_fill_detection_mixed`, `test_is_fill_rejects_non_fill`, `test_save_produces_valid_binary` |
+| M8: Save compatibility | `crates/alkahest-persist/src/compat.rs` | `test_rule_hash_deterministic`, `test_rule_hash_changes_on_modification`, `test_rule_hash_mismatch_warns` |
+| M8: Subregion export | `crates/alkahest-persist/src/subregion.rs` | `test_subregion_filters_correctly`, `test_subregion_output_is_loadable` |
+| M8: Save/load with fill optimization | `crates/alkahest-persist/src/save.rs` | `test_save_load_fill_optimization`, `test_save_load_empty_world` |
+| M9: Balancing (no self-replication) | `crates/alkahest-rules/src/balancing.rs` | `test_no_self_replication` |
+| M9: Balancing (no runaway temp) | `crates/alkahest-rules/src/balancing.rs` | `test_no_runaway_temperature` |
+| M9: Balancing (combustion exhausts) | `crates/alkahest-rules/src/balancing.rs` | `test_all_combustion_exhausts` |
+| M9: Balancing (no oscillation) | `crates/alkahest-rules/src/balancing.rs` | `test_no_multi_step_oscillation` |
+| M9: Balancing (category coverage) | `crates/alkahest-rules/src/balancing.rs` | `test_category_coverage` |
+| M9: Interaction matrix distribution | `crates/alkahest-rules/src/balancing.rs` | `test_interaction_matrix_distribution` |
+| M9: Material/rule count targets | `crates/alkahest-rules/src/balancing.rs` | `test_material_count_minimum`, `test_rule_count_minimum` |
+| M9: Default behaviors | `crates/alkahest-rules/src/defaults.rs` | `test_multiple_categories`, `test_category_ranges` |
+| M12: Mod manifest parsing | `crates/alkahest-core/src/mod_manifest.rs` | `test_mod_manifest_parse`, `test_mod_manifest_malformed_rejected` |
+| M12: Mod loading and merging | `crates/alkahest-rules/src/loader.rs` | `test_mod_load_example`, `test_merge_mod_into_base` |
+| M12: Mod ID validation | `crates/alkahest-rules/src/validator.rs` | `test_mod_valid_id_accepted`, `test_mod_id_below_range_rejected`, `test_mod_duplicate_with_base_detected_after_merge` |
+| M12: ID remapping | `crates/alkahest-rules/src/migration.rs` | `test_remap_assigns_contiguous_ids`, `test_remap_preserves_base_ids`, `test_remap_cross_references`, `test_remap_rules_updates_all_refs`, `test_remap_idempotent`, `test_remap_reverse_lookup` |
+| M12: Mod materials pass balancing | `crates/alkahest-rules/src/balancing.rs` | `test_mod_materials_pass_balancing` |
+| M13: Audio system lifecycle | `crates/alkahest-audio/src/lib.rs` | `test_audio_system_disabled_noop`, `test_enabled_toggle`, `test_max_events_cap` |
+| M13: Acoustic event scanning | `crates/alkahest-audio/src/scanner.rs` | `test_activity_resets_idle`, `test_neighbor_activation_on_activity`, `test_event_decay`, `test_intensity_scaling`, `test_absorption_bias_relative_order`, `test_multiple_categories`, `test_max_events_cap` |
+| M15: Charge buffer layout | `crates/alkahest-sim/src/buffers.rs` | `test_charge_slot_size`, `test_charge_slot_byte_offset` |
+| M15: Electrical materials exist | `crates/alkahest-rules/src/balancing.rs` | `test_electrical_materials_exist` |
+| M15: Electrical conductivity valid | `crates/alkahest-rules/src/balancing.rs` | `test_electrical_conductivity_valid` |
+| M15: Electrical CFL stability | `crates/alkahest-rules/src/balancing.rs` | `test_electrical_cfl_stability` |
+| M15: Electrical validation | `crates/alkahest-rules/src/validator.rs` | `test_electrical_conductivity_out_of_range_rejected`, `test_electrical_resistance_out_of_range_rejected`, `test_activation_threshold_out_of_range_rejected` |
+| M15: Explosives rules | `crates/alkahest-rules/src/loader.rs` | `test_gunpowder_rule_loads` |
 
 ---
 

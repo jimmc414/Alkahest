@@ -1,8 +1,8 @@
 # ALKAHEST: Architecture Document
 
-**Version:** 0.1.0-draft
-**Date:** 2026-02-13
-**Status:** Draft
+**Version:** 1.0.0
+**Date:** 2026-02-16
+**Status:** Complete
 **Companion:** requirements.md v0.1.0
 
 ---
@@ -19,7 +19,7 @@ Alkahest is structured as a split CPU/GPU application. The CPU side (Rust compil
 
 ### 2.1 High-Level Module Decomposition
 
-The application is divided into six major subsystems:
+The application is divided into eight major subsystems:
 
 **World Manager (CPU):** Owns the sparse voxel octree. Manages chunk allocation, activation, deactivation, and streaming. Determines which chunks contain active voxels and builds the dispatch list for the GPU each frame.
 
@@ -33,13 +33,17 @@ The application is divided into six major subsystems:
 
 **Persistence (CPU):** Handles save/load serialization, compression, and file I/O.
 
+**Audio (CPU):** Scans active chunks for acoustic events (fire, water flow, rupture), generates procedural audio via Web Audio API, and mixes with spatial attenuation relative to the camera.
+
+**Electrical Subsystem (GPU):** Propagates electrical charge through conductive materials using a separate double-buffered charge buffer. Applies Joule heating to resistive materials. Supports logic materials (AND gates, wires, switches) for player-built circuits.
+
 ### 2.2 Data Flow Per Frame
 
 A single frame proceeds in this order:
 
 1. **Input Processing (CPU):** Read player input events. Update camera state. If the player is placing/removing voxels, write modification commands into a GPU-accessible command buffer.
 2. **Chunk Management (CPU):** Evaluate which chunks are active (contain non-static voxels or are near recently modified regions). Update the dispatch list. Load/unload chunks based on camera position and activity.
-3. **Simulation Dispatch (GPU):** Execute the simulation compute shaders over all active chunks. This consumes the command buffer (applying player modifications), then runs the automata tick. Double-buffer swap occurs after all dispatches complete.
+3. **Simulation Dispatch (GPU):** Execute the simulation compute shaders over all active chunks. This consumes the command buffer (applying player modifications), then runs the automata tick (movement, reactions, thermal, electrical, pressure passes). Double-buffer swap occurs after all dispatches complete.
 4. **Activity Scan (GPU):** A lightweight compute pass scans each chunk to determine if any voxels changed state. Writes per-chunk activity flags back to a CPU-readable buffer. This feeds into the next frame's chunk management step.
 5. **Render (GPU):** Ray march the voxel data to produce the final image. Lighting and post-processing passes follow.
 6. **UI Overlay (CPU/GPU):** Composite the HUD, material browser, and debug info over the rendered image.
@@ -138,7 +142,11 @@ The simulation runs as multiple compute shader dispatches per tick, in a fixed o
 
 **Pass 3 — Reactions and State Transitions:** Evaluates the interaction matrix for all adjacent voxel pairs. Produces byproducts, triggers state changes (melting, igniting, dissolving). This pass reads the output of Pass 2 (post-movement positions).
 
-**Pass 4 — Field Propagation:** Diffuses temperature, pressure, and (optionally) electrical charge across neighbors. This is a straightforward stencil operation with material-dependent diffusion rates.
+**Pass 4a — Thermal:** Diffuses temperature across neighbors using a material-dependent stencil. Applies entropy drain toward ambient temperature and convection bias for heated fluids.
+
+**Pass 4b — Electrical:** Propagates electrical charge through conductive materials using a separate double-buffered charge buffer. Uses 6 face-adjacent neighbors (not the 26-neighbor stencil of the thermal pass). Applies Joule heating to resistive voxels by writing temperature deltas into the voxel write buffer. Supports logic materials (AND gates, wires, switches) via charge threshold evaluation in the reactions pass.
+
+**Pass 4c — Pressure:** Diffuses pressure between enclosed voxels. Detects rupture when pressure exceeds structural integrity, producing blast waves.
 
 **Pass 5 — Activity Scan:** Each workgroup scans its chunk and writes a single flag: 1 if any voxel in the chunk changed between the read buffer and write buffer, 0 otherwise. This flag array is read back by the CPU for chunk state management.
 
@@ -178,7 +186,7 @@ Each material definition specifies:
 
 **Identity:** Unique u16 ID, string name, category tag, brief description.
 
-**Physical properties:** Phase, density, thermal conductivity, melting point, boiling point, ignition point, structural integrity, viscosity (for liquids), angle of repose (for powders), flammability, electrical conductivity (optional), color, emission intensity.
+**Physical properties:** Phase, density, thermal conductivity, melting point, boiling point, ignition point, structural integrity, viscosity (for liquids), angle of repose (for powders), flammability, electrical conductivity, color, emission intensity.
 
 **State transition rules:** A list of conditions under which this material transforms into another material. Each rule specifies a trigger (temperature threshold, pressure threshold, contact with specific material) and a result (new material ID, energy released/absorbed).
 
@@ -194,7 +202,7 @@ Pairwise interactions between materials are stored separately from individual ma
 
 The interaction matrix is compiled at load time into a GPU-friendly format: a 2D texture where each texel at coordinates (material_A, material_B) contains an index into a rule buffer. Since not all 65535² pairs have rules, this uses a sparse representation: a hash map on the CPU resolves to a packed rule array on the GPU, with a small indirection texture.
 
-For 500 materials with 10,000 defined interactions, the lookup texture is 500×500 = 250,000 entries (indices or "no rule" sentinels), at 4 bytes each = 1 MB. The rule data buffer (10,000 rules at ~32 bytes each) = 320 KB. Total rule data on GPU: ~1.3 MB. This is negligible.
+With 561 materials and 11,998 defined interactions, the lookup texture is 561x561 = 314,721 entries (indices or "no rule" sentinels), at 4 bytes each = ~1.2 MB. The rule data buffer (11,998 rules at ~32 bytes each) = ~375 KB. Total rule data on GPU: ~1.6 MB. This is negligible.
 
 ### 6.4 Rule Priority and Conflict Resolution
 
@@ -277,6 +285,38 @@ When a voxel's pressure exceeds its material's structural integrity, it is destr
 
 ---
 
+## 9b. Electrical Subsystem Design
+
+### 9b.1 Charge Propagation Model
+
+Electrical charge propagates through conductive materials using a discrete diffusion model similar to thermal propagation but operating on a separate per-voxel charge value. Each voxel's charge is stored in a dedicated double-buffered charge buffer (not packed into the 8-byte voxel layout) as a u32 with the low 8 bits used for charge level (0-255).
+
+The propagation uses only the 6 face-adjacent neighbors (not the 26-neighbor stencil), reflecting real-world electrical conduction paths. The update formula:
+
+    new_charge = current_charge + rate * sum(neighbor_conductivity * (neighbor_charge - current_charge))
+
+The propagation rate respects a CFL stability condition analogous to the thermal system.
+
+### 9b.2 Joule Heating
+
+When current flows through a resistive material (nonzero conductivity but below the maximum), the electrical pass applies Joule heating: the temperature of the voxel increases proportional to the charge flow and the material's resistance (inverse of conductivity). This creates natural interactions — current through a wire heats it, potentially melting low-melting-point conductors or igniting adjacent flammable materials.
+
+### 9b.3 Logic Materials
+
+Materials with special electrical properties enable player-built circuits:
+- **Wire:** High conductivity, propagates charge with minimal loss.
+- **Resistor:** Moderate conductivity, generates significant Joule heating.
+- **Switch:** Conductivity toggled by player interaction or adjacent charge.
+- **AND gate:** Outputs charge only when receiving charge from two or more distinct faces.
+
+Logic behavior is evaluated during the reactions pass via charge-condition fields on interaction rules, not hardcoded in shaders.
+
+### 9b.4 Buffer Architecture
+
+The electrical subsystem uses a separate bind group (`@group(1)`) to avoid exceeding the 8 storage buffer per-stage limit (C-GPU-3). The charge buffer is double-buffered (charge_read, charge_write) alongside the voxel double buffer, with swap synchronized at the same point. Each charge slot is 128 KB per chunk (32^3 voxels * 4 bytes).
+
+---
+
 ## 10. Structural Integrity Subsystem Design
 
 ### 10.1 Bond Graph (Simplified)
@@ -307,7 +347,11 @@ However, loaded-static and boundary chunks also occupy memory (single-buffered, 
 
 ### 11.2 Rule Data
 
-Interaction lookup texture (500×500×4 bytes) + rule buffer (10,000 × 32 bytes): ~1.3 MB. Negligible.
+Interaction lookup texture (561x561x4 bytes) + rule buffer (11,998 x 32 bytes): ~1.6 MB. Negligible.
+
+### 11.2b Charge Buffer (Electrical)
+
+The electrical subsystem adds a double-buffered charge buffer: 128 KB per chunk per buffer. For 31 active chunks double-buffered: 31 x 128 KB x 2 = ~8 MB. For 200 loaded chunks (single-buffered charge for static chunks): 200 x 128 KB + 31 x 128 KB = ~29 MB additional. This is modest relative to the voxel data budget.
 
 ### 11.3 Render Buffers
 
@@ -315,7 +359,7 @@ Octree acceleration structure: estimated 50–100 MB depending on world complexi
 
 ### 11.4 Total GPU Memory Estimate
 
-Voxel data (~60 MB) + rule data (~1.3 MB) + octree (~100 MB) + render buffers (~60 MB) + overhead (~30 MB) ≈ **250 MB** for a typical scene with 1M active voxels. This is well within the 4–8 GB available on mid-range GPUs.
+Voxel data (~60 MB) + rule data (~1.6 MB) + charge buffers (~29 MB) + octree (~100 MB) + render buffers (~60 MB) + overhead (~30 MB) ≈ **280 MB** for a typical scene with 1M active voxels. This is well within the 4–8 GB available on mid-range GPUs.
 
 ### 11.5 CPU (WASM) Memory
 
@@ -432,7 +476,7 @@ The Rust WASM module accesses WebGPU through the wgpu crate (which targets both 
 
 ### 17.1 Mod Loading
 
-A mod is a directory (or zip archive) containing material definition files and interaction rule files in the same format the base game uses. Mods are loaded after the base rule set. Mod materials receive IDs in a reserved range (e.g., 1000+ for base materials, 10000+ for mod materials) to avoid collisions.
+A mod is a directory (or zip archive) containing material definition files and interaction rule files in the same format the base game uses. Mods are loaded after the base rule set. Mod materials receive IDs in a reserved range (base materials use 0–9999, mod materials use 10000+) to avoid collisions.
 
 ### 17.2 Rule Conflict Resolution
 
