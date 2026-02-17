@@ -72,6 +72,18 @@ pub struct MaterialDef {
     /// Depth-dependent color absorption rate for transparent materials (e.g. water darkening).
     #[serde(default)]
     pub absorption_rate: f32,
+    /// Electrical conductivity (0.0 = insulator, 1.0 = superconductor).
+    #[serde(default)]
+    pub electrical_conductivity: f32,
+    /// Electrical resistance for Joule heating (0.0 = no heat, 1.0 = max heating).
+    #[serde(default)]
+    pub electrical_resistance: f32,
+    /// Minimum charged neighbors required for charge propagation (0 = always, 2 = AND gate).
+    #[serde(default)]
+    pub activation_threshold: u8,
+    /// Constant charge emission per tick (0 = none, 255 = Power Source).
+    #[serde(default)]
+    pub charge_emission: u8,
 }
 
 /// Collection of material definitions indexed by ID.
@@ -136,6 +148,10 @@ mod tests {
                 structural_integrity: 0.0,
                 opacity: None,
                 absorption_rate: 0.0,
+                electrical_conductivity: 0.0,
+                electrical_resistance: 0.0,
+                activation_threshold: 0,
+                charge_emission: 0,
             }],
         };
         assert!(table.get(2).is_some());

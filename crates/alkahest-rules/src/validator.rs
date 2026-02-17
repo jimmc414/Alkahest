@@ -228,6 +228,10 @@ mod tests {
             structural_integrity: 0.0,
             opacity: None,
             absorption_rate: 0.0,
+            electrical_conductivity: 0.0,
+            electrical_resistance: 0.0,
+            activation_threshold: 0,
+            charge_emission: 0,
         }
     }
 
@@ -300,6 +304,8 @@ mod tests {
                 min_temp: 0,
                 max_temp: 0,
                 pressure_delta: 0,
+                min_charge: 0,
+                max_charge: 0,
             }],
         };
         let result = validate_rules(&rules, &table);
@@ -325,6 +331,8 @@ mod tests {
                 min_temp: 0,
                 max_temp: 0,
                 pressure_delta: 0,
+                min_charge: 0,
+                max_charge: 0,
             }],
         };
         let result = validate_rules(&rules, &table);
@@ -358,6 +366,8 @@ mod tests {
                     min_temp: 0,
                     max_temp: 0,
                     pressure_delta: 0,
+                    min_charge: 0,
+                    max_charge: 0,
                 },
                 InteractionRule {
                     name: "BtoA".into(),
@@ -370,6 +380,8 @@ mod tests {
                     min_temp: 0,
                     max_temp: 0,
                     pressure_delta: 0,
+                    min_charge: 0,
+                    max_charge: 0,
                 },
             ],
         };

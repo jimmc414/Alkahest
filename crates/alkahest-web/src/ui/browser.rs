@@ -141,6 +141,10 @@ mod tests {
                     structural_integrity: 0.0,
                     opacity: None,
                     absorption_rate: 0.0,
+                    electrical_conductivity: 0.0,
+                    electrical_resistance: 0.0,
+                    activation_threshold: 0,
+                    charge_emission: 0,
                 },
                 MaterialDef {
                     id: 1,
@@ -161,6 +165,10 @@ mod tests {
                     structural_integrity: 50.0,
                     opacity: None,
                     absorption_rate: 0.0,
+                    electrical_conductivity: 0.0,
+                    electrical_resistance: 0.0,
+                    activation_threshold: 0,
+                    charge_emission: 0,
                 },
                 MaterialDef {
                     id: 2,
@@ -181,6 +189,10 @@ mod tests {
                     structural_integrity: 0.0,
                     opacity: None,
                     absorption_rate: 0.0,
+                    electrical_conductivity: 0.0,
+                    electrical_resistance: 0.0,
+                    activation_threshold: 0,
+                    charge_emission: 0,
                 },
                 MaterialDef {
                     id: 3,
@@ -201,6 +213,10 @@ mod tests {
                     structural_integrity: 0.0,
                     opacity: Some(0.5),
                     absorption_rate: 0.15,
+                    electrical_conductivity: 0.0,
+                    electrical_resistance: 0.0,
+                    activation_threshold: 0,
+                    charge_emission: 0,
                 },
             ],
         }

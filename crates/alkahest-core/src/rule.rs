@@ -35,6 +35,12 @@ pub struct InteractionRule {
     /// Positive = pressure increase (explosions), negative = pressure decrease.
     #[serde(default)]
     pub pressure_delta: i32,
+    /// Minimum charge for the reaction to occur. 0 = no minimum.
+    #[serde(default)]
+    pub min_charge: u32,
+    /// Maximum charge for the reaction to occur. 0 = no maximum.
+    #[serde(default)]
+    pub max_charge: u32,
 }
 
 /// Collection of interaction rules.
@@ -73,6 +79,8 @@ mod tests {
                 min_temp: 0,
                 max_temp: 0,
                 pressure_delta: 0,
+                min_charge: 0,
+                max_charge: 0,
             }],
         };
         assert_eq!(set.len(), 1);

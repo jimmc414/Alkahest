@@ -366,6 +366,10 @@ mod tests {
                     structural_integrity: 0.0,
                     opacity: None,
                     absorption_rate: 0.0,
+                    electrical_conductivity: 0.0,
+                    electrical_resistance: 0.0,
+                    activation_threshold: 0,
+                    charge_emission: 0,
                 },
                 alkahest_core::material::MaterialDef {
                     id: 1,
@@ -386,6 +390,10 @@ mod tests {
                     structural_integrity: 63.0,
                     opacity: None,
                     absorption_rate: 0.0,
+                    electrical_conductivity: 0.0,
+                    electrical_resistance: 0.0,
+                    activation_threshold: 0,
+                    charge_emission: 0,
                 },
             ],
         };
