@@ -33,6 +33,39 @@ The simulation runs entirely on the GPU via compute shaders. Every voxel is 8 by
 | UI | egui |
 | Target | Modern browsers (Chrome, Firefox, Edge) |
 
+## Features
+
+- **561 materials** across 8 categories (naturals, metals, organics, energy, synthetics, exotic, explosives, electrical) with **11,995 interaction rules**
+- **7-pass GPU simulation pipeline:** Commands, Movement, Reactions, Thermal, Electrical, Pressure, Activity Scan — all running in compute shaders with double-buffered state
+- **Electrical system:** Charge propagation, resistance heating, logic gates (Signal Sand AND gate, Toggle-ite memory latch), short-circuit cascades
+- **Rendering:** Ray-marched voxels with ambient occlusion, volumetric transparency, LOD for distant chunks, sky dome, and 64 simultaneous dynamic lights with shadow rays
+- **Procedural audio:** Spatialized sound for fire, water, steam, explosions, and structural collapse driven by simulation state
+- **Save/load:** LZ4-compressed binary format with auto-save, subregion export, and Web Worker serialization
+- **Modding:** Load custom material and rule packs from external RON files with validation, conflict resolution, and multi-mod support
+- **Full sandbox tools:** Brush shapes (single/cube/sphere), material browser, heat/freeze tools, wind gun, cross-section view, first-person camera, simulation speed control
+
+## Build Instructions
+
+```bash
+# Build WASM
+wasm-pack build --release crates/alkahest-web --target web
+
+# Lint
+cargo clippy --workspace -- -D warnings
+
+# Format check
+cargo fmt --all -- --check
+
+# Unit tests (CPU only, fast)
+cargo test --workspace
+
+# GPU tests (requires GPU, slower)
+cargo test --workspace --features gpu_tests
+
+# Full CI
+ci/build.sh && ci/test.sh
+```
+
 ## Project Documentation
 
 | Document | Purpose |
@@ -44,10 +77,12 @@ The simulation runs entirely on the GPU via compute shaders. Every voxel is 8 by
 | [Technical Constraints](docs/technical-constraints.md) | Platform limitations and prohibited patterns |
 | [Test Strategy](docs/test-strategy.md) | Testing approach per milestone and subsystem |
 | [Agent Prompt](docs/agent-prompt.md) | Implementation guide for AI-assisted development |
+| [Modding Guide](docs/modding-guide.md) | How to create custom material and rule packs |
+| [Recipes](docs/recipes.md) | Emergent recipes discovered through material interactions |
 
 ## Status
 
-Under construction. See [milestones.md](docs/milestones.md) for current progress.
+All 16 milestones (M0-M15) complete. 561 materials, 11,995 interaction rules, 7-pass simulation pipeline. See [milestones.md](docs/milestones.md) for the full development history.
 
 ## License
 

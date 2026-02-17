@@ -1,23 +1,48 @@
 # ALKAHEST: Milestone Plan
 
-**Version:** 0.1.0-draft
-**Date:** 2026-02-13
-**Status:** Draft
-**Companions:** requirements.md v0.1.0, architecture.md v0.1.0
+**Version:** 1.0.0
+**Date:** 2026-02-16
+**Status:** Complete — all milestones delivered
+**Companions:** requirements.md v1.0.0, architecture.md v0.1.0
 
 ---
 
 ## 1. How to Use This Document
 
-Each milestone produces a working, testable artifact. No milestone should take longer than 2–3 weeks of focused implementation. Milestones are sequential — do not begin milestone N+1 until milestone N passes all acceptance criteria. Within a milestone, tasks are ordered by dependency.
+All 16 milestones (M0-M15) are complete. This document is now a historical record of the build plan and acceptance criteria used during development.
 
-"Acceptance criteria" means automated tests unless stated otherwise. "Visual verification" means a human looks at the output and confirms it matches the described behavior — these should be converted to screenshot regression tests when the renderer stabilizes.
+Each milestone produced a working, testable artifact. Milestones were sequential — milestone N+1 was not begun until milestone N passed all acceptance criteria. Within a milestone, tasks were ordered by dependency.
+
+"Acceptance criteria" means automated tests unless stated otherwise. "Visual verification" means a human looks at the output and confirms it matches the described behavior — these were converted to screenshot regression tests when the renderer stabilized.
 
 Architecture references (e.g., ARCH 5.2) point to architecture.md sections. Requirement references (e.g., REQ 4.1.2) point to requirements.md sections.
+
+### Completion Summary
+
+| Milestone | Name | Key Deliverable |
+|-----------|------|-----------------|
+| M0 | Toolchain and Empty Window | Rust/WASM/WebGPU pipeline, egui debug panel |
+| M1 | Static Voxel Rendering | Ray march shader, free-orbit camera, single-light shadows |
+| M2 | Gravity Simulation | Double-buffered compute pipeline, checkerboard conflict resolution |
+| M3 | Multi-Material and Reactions | Data-driven rule engine, 10 materials, 15+ rules |
+| M4 | Thermal System | Heat diffusion, phase transitions, convection |
+| M5 | Multi-Chunk World | Chunk state machine, cross-chunk simulation, octree rendering |
+| M6 | Pressure and Structural | Pressure accumulation, rupture/explosions, structural collapse |
+| M7 | Player Tools and UI | Brush system, material browser, cross-section view, first-person camera |
+| M8 | Save/Load | LZ4 compressed binary format, auto-save, subregion export |
+| M9 | Material Expansion (200+) | 200+ materials, 2000+ rules, balancing test suite |
+| M10 | Rendering Polish | Ambient occlusion, 64 dynamic lights, volumetric transparency, LOD |
+| M11 | Performance and Stress | 1M voxels at 60 FPS, graceful degradation |
+| M12 | Modding Support | Mod loader, validation, conflict resolution, example mod |
+| M13 | Audio | Procedural spatialized audio driven by simulation state |
+| M14 | Extended Materials (500+) | 561 materials, 11,995 rules across 8 categories |
+| M15 | Electrical System | Charge propagation, logic gates, resistance heating, 10 electrical materials |
 
 ---
 
 ## 2. Milestone 0: Toolchain and Empty Window
+
+**Status: Complete**
 
 **Goal:** Confirm the full build pipeline works end-to-end before writing any engine code. This milestone has zero game logic. It exists to surface toolchain problems early.
 
@@ -45,6 +70,8 @@ Architecture references (e.g., ARCH 5.2) point to architecture.md sections. Requ
 ---
 
 ## 3. Milestone 1: Static Voxel Rendering
+
+**Status: Complete**
 
 **Goal:** Render a single chunk of static voxels using the ray march pipeline described in ARCH 7.1. No simulation. The voxels are hardcoded in a buffer and never change. This milestone validates the core rendering approach.
 
@@ -74,6 +101,8 @@ Architecture references (e.g., ARCH 5.2) point to architecture.md sections. Requ
 
 ## 4. Milestone 2: Simulation Loop — Gravity Only
 
+**Status: Complete**
+
 **Goal:** Get the simulation compute pipeline running with the simplest possible physics: sand falls due to gravity. This validates double buffering, the compute dispatch pipeline, and the simulation-to-renderer data flow.
 
 **Deliverable:** Sand voxels fall downward and pile up on stone floor voxels. The player sees voxels move in real time.
@@ -102,6 +131,8 @@ Architecture references (e.g., ARCH 5.2) point to architecture.md sections. Requ
 ---
 
 ## 5. Milestone 3: Multi-Material and Basic Reactions
+
+**Status: Complete**
 
 **Goal:** Introduce the data-driven rule engine and multiple materials. This is the milestone where the material definition schema and interaction matrix are designed, loaded from files, and uploaded to the GPU. The simulation moves from hardcoded behavior to data-driven behavior.
 
@@ -146,6 +177,8 @@ Air (empty), Stone (static solid), Sand (falling granular), Water (flowing liqui
 
 ## 6. Milestone 4: Thermal System
 
+**Status: Complete**
+
 **Goal:** Temperature becomes a live simulation property. Materials conduct, radiate, and respond to heat. This is the first field-propagation system and validates the ARCH 5.2 Pass 4 pipeline.
 
 **Deliverable:** Heat flows through materials at material-dependent rates. Temperature-driven state transitions (melting, boiling, ignition) work correctly.
@@ -177,6 +210,8 @@ Air (empty), Stone (static solid), Sand (falling granular), Water (flowing liqui
 ---
 
 ## 7. Milestone 5: Multi-Chunk World
+
+**Status: Complete**
 
 **Goal:** Expand from a single 32³ chunk to a multi-chunk world. This is a major architectural milestone — it introduces the chunk state machine, sparse allocation, cross-chunk neighbor lookups, and the activity scan. Expect this to be the most difficult milestone.
 
@@ -218,6 +253,8 @@ Air (empty), Stone (static solid), Sand (falling granular), Water (flowing liqui
 
 ## 8. Milestone 6: Pressure and Structural Integrity
 
+**Status: Complete**
+
 **Goal:** Add the final two physics subsystems. Pressure enables explosions and sealed-container behavior. Structural integrity enables realistic collapse of unsupported structures.
 
 **Deliverable:** Enclosed pressurized containers that rupture when overstressed, and structures that collapse when their supports are destroyed.
@@ -248,6 +285,8 @@ Air (empty), Stone (static solid), Sand (falling granular), Water (flowing liqui
 ---
 
 ## 9. Milestone 7: Player Tools and UI
+
+**Status: Complete**
 
 **Goal:** The game becomes playable as a sandbox. All core player interactions described in REQ 7 are implemented with a polished UI.
 
@@ -288,6 +327,8 @@ Air (empty), Stone (static solid), Sand (falling granular), Water (flowing liqui
 
 ## 10. Milestone 8: Save/Load and Persistence
 
+**Status: Complete**
+
 **Goal:** Players can save their worlds and load them back. This completes the core sandbox feature set.
 
 **Deliverable:** Binary save/load with LZ4 compression, auto-save, and subregion export.
@@ -321,6 +362,8 @@ Air (empty), Stone (static solid), Sand (falling granular), Water (flowing liqui
 
 ## 11. Milestone 9: Material Expansion and Balancing
 
+**Status: Complete**
+
 **Goal:** Scale from 10 materials to 200+ materials with a dense interaction matrix. This is the milestone where AI-assisted content generation (REQ 11.1.1) becomes the primary workflow.
 
 **Deliverable:** 200+ materials, 2,000+ interaction rules, organized into the categories defined in REQ 5.2.2.
@@ -351,6 +394,8 @@ Air (empty), Stone (static solid), Sand (falling granular), Water (flowing liqui
 ---
 
 ## 12. Milestone 10: Rendering Polish
+
+**Status: Complete**
 
 **Goal:** Bring the visual quality up to release standard. The ray marcher works but looks basic after Milestone 1. This milestone adds the visual features that make the simulation readable and appealing.
 
@@ -383,6 +428,8 @@ Air (empty), Stone (static solid), Sand (falling granular), Water (flowing liqui
 
 ## 13. Milestone 11: Performance and Stress Testing
 
+**Status: Complete**
+
 **Goal:** Validate REQ 3.2.1 (1M voxels at 60 FPS) and REQ 3.2.3 (graceful degradation). This is a dedicated optimization and hardening milestone.
 
 **Deliverable:** Documented performance characteristics and working graceful degradation.
@@ -414,6 +461,8 @@ Air (empty), Stone (static solid), Sand (falling granular), Water (flowing liqui
 
 ## 14. Milestone 12: Modding Support
 
+**Status: Complete**
+
 **Goal:** External users can create and load custom materials and rule sets.
 
 **Deliverable:** Documented mod format, mod loader with validation, conflict resolution, and at least one example community mod pack.
@@ -441,7 +490,9 @@ Air (empty), Stone (static solid), Sand (falling granular), Water (flowing liqui
 
 ---
 
-## 15. Milestone 13: Audio (Optional)
+## 15. Milestone 13: Audio
+
+**Status: Complete**
 
 **Goal:** Procedural audio driven by simulation state.
 
@@ -469,6 +520,8 @@ Air (empty), Stone (static solid), Sand (falling granular), Water (flowing liqui
 
 ## 16. Milestone 14: Extended Material Set (500+)
 
+**Status: Complete** — Final count: 561 materials, 11,995 interaction rules.
+
 **Goal:** Hit the REQ 5.2.1 target of 500 materials and REQ 4.3.6 target of 10,000 interaction rules.
 
 **Deliverable:** The full material library with dense interaction matrix, balanced and playtested.
@@ -495,9 +548,11 @@ Air (empty), Stone (static solid), Sand (falling granular), Water (flowing liqui
 
 ---
 
-## 17. Milestone 15: Electrical System (Optional)
+## 17. Milestone 15: Electrical System
 
-**Goal:** Implement the optional electrical subsystem (REQ 4.4.5).
+**Status: Complete**
+
+**Goal:** Implement the electrical subsystem (REQ 4.4.5).
 
 **Deliverable:** Electrical conductivity, signal propagation, resistance heating, and logic materials.
 
@@ -550,23 +605,23 @@ M10 (Rendering Polish) and M11 (Performance) can run in parallel with M6–M8 if
 
 ---
 
-## 19. Risk Assessment Per Milestone
+## 19. Risk Assessment Per Milestone (with Retrospective)
 
-| Milestone | Risk Level | Primary Risk |
-|---|---|---|
-| M0 | Low | wgpu WASM compilation issues; mitigate by testing early. |
-| M1 | Medium | Ray march performance; if DDA in a 32³ grid is too slow, the entire rendering approach needs rethinking. Test on integrated GPU early. |
-| M2 | Medium | Checkerboard conflict resolution may produce visible artifacts; budget extra time for tuning. |
-| M3 | Medium | Rule engine design is load-bearing — a schema mistake here propagates to every later milestone. Over-invest in review. |
-| M4 | Low | Thermal diffusion is well-understood math. CFL stability is the only subtle issue. |
-| M5 | High | Cross-chunk simulation is the hardest single problem. Halo loading, chunk state machine, and multi-chunk rendering all land at once. Budget 3 weeks. |
-| M6 | Medium | Structural flood-fill on CPU may be too slow for large structures. Have a fallback plan (limit flood-fill radius). |
-| M7 | Low | UI work; no major unknowns. |
-| M8 | Low | Serialization; LZ4 is well-supported in Rust. |
-| M9 | Medium | Balancing 200 materials is a design challenge, not a technical one. AI generation helps with volume but not with quality — budget time for human review. |
-| M10 | Medium | 64 dynamic lights with shadow rays may blow the frame budget. Be prepared to reduce to 32 or use shadow approximations. |
-| M11 | Medium | Performance targets may not be achievable on minimum-spec hardware. Define acceptable fallback targets before starting. |
-| M12 | Low | Mod loading is straightforward given the existing data-driven architecture. |
-| M13 | Low | Audio is isolated; failure here doesn't affect the rest of the game. |
-| M14 | Medium | Same as M9, scaled up. Interaction combinatorics at 500 materials may surface degenerate behaviors missed at 200. |
-| M15 | Medium | Expanding the voxel layout may have non-obvious performance consequences. Profile early. |
+| Milestone | Risk Level | Primary Risk | Retrospective |
+|---|---|---|---|
+| M0 | Low | wgpu WASM compilation issues; mitigate by testing early. | Completed as expected. |
+| M1 | Medium | Ray march performance; if DDA in a 32³ grid is too slow, the entire rendering approach needs rethinking. | DDA performance was well within budget. |
+| M2 | Medium | Checkerboard conflict resolution may produce visible artifacts; budget extra time for tuning. | Checkerboard approach worked; deterministic tests validated correctness. |
+| M3 | Medium | Rule engine design is load-bearing — a schema mistake here propagates to every later milestone. | Schema proved stable through M14's 11,995 rules. |
+| M4 | Low | Thermal diffusion is well-understood math. CFL stability is the only subtle issue. | Completed as expected. |
+| M5 | High | Cross-chunk simulation is the hardest single problem. Halo loading, chunk state machine, and multi-chunk rendering all land at once. | Confirmed as the most complex milestone. Cross-chunk boundary handling required careful testing. |
+| M6 | Medium | Structural flood-fill on CPU may be too slow for large structures. | Flood-fill radius limiting proved sufficient. |
+| M7 | Low | UI work; no major unknowns. | Completed as expected. |
+| M8 | Low | Serialization; LZ4 is well-supported in Rust. | Completed as expected. |
+| M9 | Medium | Balancing 200 materials is a design challenge, not a technical one. | AI-assisted generation workflow scaled well. Balancing test suite caught degenerate behaviors. |
+| M10 | Medium | 64 dynamic lights with shadow rays may blow the frame budget. | 64 lights achieved with per-pixel shadow ray budget. |
+| M11 | Medium | Performance targets may not be achievable on minimum-spec hardware. | 1M voxels at 60 FPS achieved on target hardware. Graceful degradation implemented. |
+| M12 | Low | Mod loading is straightforward given the existing data-driven architecture. | Data-driven architecture paid off — mod system required minimal engine changes. |
+| M13 | Low | Audio is isolated; failure here doesn't affect the rest of the game. | Completed as expected. Procedural audio adds significant atmosphere. |
+| M14 | Medium | Same as M9, scaled up. Interaction combinatorics at 500 materials may surface degenerate behaviors missed at 200. | Scaled to 561 materials / 11,995 rules. Balancing suite expanded accordingly. |
+| M15 | Medium | Expanding the voxel layout may have non-obvious performance consequences. | Electrical pass added as 5th simulation pass. 10 dedicated electrical materials with charge-gated rules. |

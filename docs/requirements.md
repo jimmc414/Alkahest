@@ -2,9 +2,9 @@
 
 ## Requirements Specification
 
-**Version:** 0.1.0-draft
-**Date:** 2026-02-13
-**Status:** Draft
+**Version:** 1.0.0
+**Date:** 2026-02-16
+**Status:** Fulfilled
 
 ---
 
@@ -136,7 +136,7 @@ Alkahest is a browser-based 3D voxel sandbox built on cellular automata principl
 
 4.4.4.4. The structural solver MUST NOT require full rigid-body physics. A simplified connected-component analysis with aggregate force thresholds is RECOMMENDED.
 
-#### 4.4.5 Electrical System (OPTIONAL)
+#### 4.4.5 Electrical System (IMPLEMENTED)
 
 4.4.5.1. The simulation MAY implement an electrical conductivity property per material.
 
@@ -348,3 +348,68 @@ This section documents requirements for the development workflow, not the runtim
 - **Powder Toy** (Community, 2008–present): 2D particle simulator with ~180 elements including electrical and logic components. Benchmark for element count and community modding.
 - **Teardown** (Tuxedo Labs, 2022): Voxel-based 3D destructible environments with ray-traced rendering. Benchmark for 3D voxel rendering quality.
 - **Minecraft** (Mojang, 2011): Block-based 3D sandbox. Benchmark for world scale, modding ecosystem, and player creative freedom.
+
+---
+
+## Appendix C: Requirement Fulfillment Matrix
+
+| Requirement | Description | Milestone |
+|-------------|-------------|-----------|
+| 3.1.1 | WebGPU browser target | M0 |
+| 3.1.2 | Rust/WASM compilation | M0 |
+| 3.1.3 | Chrome, Edge, Firefox support | M0 |
+| 3.1.4 | No browser plugins | M0 |
+| 3.2.1 | 1M voxels at 60 FPS (RTX 4060) | M11 |
+| 3.2.2 | 3M voxels at 60 FPS (RTX 4090) | M11 |
+| 3.2.3 | Graceful degradation | M11 |
+| 3.2.4 | GPU compute simulation | M2 |
+| 3.2.5 | Memory under 4 GB | M11 |
+| 3.2.6 | Payload under 50 MB | M11 |
+| 4.1.1 | Voxel grid | M1 |
+| 4.1.2 | Voxel state fields | M1 |
+| 4.1.3 | GPU cache-coherent layout | M1 |
+| 4.1.4 | Double buffering | M2 |
+| 4.2.1 | Chunked sparse structure | M5 |
+| 4.2.2 | Fixed-size chunks (32x32x32) | M5 |
+| 4.2.3 | Skip static/empty chunks | M5 |
+| 4.2.4 | Dynamic chunk loading | M5 |
+| 4.2.5 | 1024x512x1024 world volume | M5 |
+| 4.3.1 | 26-neighbor evaluation | M2 |
+| 4.3.2a | State transitions | M3 |
+| 4.3.2b | Movement (density-driven) | M2, M3 |
+| 4.3.2c | Reactions (byproducts) | M3 |
+| 4.3.2d | Field propagation | M4, M15 |
+| 4.3.3 | Data-driven rules (RON) | M3 |
+| 4.3.4 | Conditional rule logic | M3 |
+| 4.3.5 | 500+ material types | M14 |
+| 4.3.6 | 10,000+ pairwise rules | M14 |
+| 4.3.7 | Deterministic simulation | M2 |
+| 4.4.1 | Gravity and movement | M2, M3 |
+| 4.4.2 | Thermal system | M4 |
+| 4.4.3 | Pressure system | M6 |
+| 4.4.4 | Structural integrity | M6 |
+| 4.4.5 | Electrical system | M15 |
+| 5.1.1 | Material base properties | M3 |
+| 5.1.2 | Optional material properties | M9, M15 |
+| 5.1.3 | External data files | M3 |
+| 5.2.1 | 500+ material types | M14 |
+| 5.2.2 | Material categories | M9, M14 |
+| 5.2.3 | 50+ per category | M14 |
+| 5.3.1-2 | Logic/signal materials | M15 |
+| 6.1.1 | WebGPU rendering | M1 |
+| 6.1.2 | Ray marching | M1 |
+| 6.1.3 | 64 dynamic lights | M10 |
+| 6.1.4 | Ambient occlusion | M10 |
+| 6.1.6 | Transparency | M10 |
+| 6.2.1 | Free-orbit camera | M1 |
+| 6.2.2 | Cross-section view | M7 |
+| 6.2.3 | First-person camera | M7 |
+| 7.1.1-7 | Player tools | M7 |
+| 7.2.1-3 | Material browser | M7 |
+| 7.3.1-5 | Save/load | M8 |
+| 7.4.1 | Subregion export | M8 |
+| 8.1.1-5 | UI requirements | M7 |
+| 9.1.1-3 | Audio | M13 |
+| 10.1.1-4 | Modding support | M12 |
+| 11.1.1-5 | AI-assisted development | M9, M14 |
+| 12.1.1-3 | Code quality / CI | M0 |

@@ -99,11 +99,21 @@ Rules define pairwise interactions between materials:
         min_temp: 800,                       // u32, minimum temp for reaction (0 = any)
         max_temp: 0,                         // u32, maximum temp for reaction (0 = any)
         pressure_delta: 0,                   // i32, pressure change
+        min_charge: 0,                       // u32, minimum charge for reaction (0 = any)
+        max_charge: 0,                       // u32, maximum charge for reaction (0 = any)
     ),
 ]
 ```
 
 **Required fields:** `name`, `input_a`, `input_b`, `output_a`, `output_b`, `probability`
+
+### Electrical Rule Fields
+
+The `min_charge` and `max_charge` fields gate reactions on electrical charge level. This enables charge-dependent behavior:
+
+- `min_charge: 100` — reaction only fires when the voxel's charge is >= 100 (e.g., overload/short-circuit rules)
+- `max_charge: 10` — reaction only fires when charge is <= 10 (e.g., Toggle-ite deactivation when power is removed)
+- Both set to 0 (default) — reaction is not charge-gated
 
 ### Rule Semantics
 
@@ -111,13 +121,13 @@ Rules define pairwise interactions between materials:
 - The compiler creates bidirectional GPU entries automatically
 - `temp_delta > 0` with no material transform is rejected (energy conservation)
 - Overlapping A<->B cycles with overlapping temp ranges are rejected (infinite loops)
-- Rules reference material IDs. You can reference both base game IDs (0-249) and your mod IDs (10000+)
+- Rules reference material IDs. You can reference both base game IDs (0-559) and your mod IDs (10000+)
 
 ## ID Allocation
 
-**Mod materials MUST use IDs >= 10000.** IDs below 10000 are reserved for the base game.
+**Mod materials MUST use IDs >= 10000.** IDs below 10000 are reserved for the base game (currently 0-559, with 561 base materials).
 
-The mod loader automatically remaps your IDs from the 10000+ range to contiguous internal IDs (starting after the base game's max ID, around ~250). This keeps the GPU lookup table compact. The mapping is:
+The mod loader automatically remaps your IDs from the 10000+ range to contiguous internal IDs (starting after the base game's max ID, currently ~560). This keeps the GPU lookup table compact. The mapping is:
 
 - **External IDs** (in your RON files): 10000+ — stable, used for save compatibility
 - **Internal IDs** (at runtime): contiguous after base — used for GPU lookup table
@@ -225,19 +235,40 @@ The included example mod (`data/mods/example-mod/`) demonstrates:
 
 ## Base Game Material ID Reference
 
-Common base game IDs for use in mod rules:
+Common base game IDs for use in mod rules (base game range: 0-559):
 
-| ID | Material | Phase |
-|----|----------|-------|
-| 0 | Air | Gas |
-| 1 | Stone | Solid |
-| 2 | Sand | Powder |
-| 3 | Water | Liquid |
-| 4 | Oil | Liquid |
-| 5 | Fire | Gas |
-| 6 | Smoke | Gas |
-| 7 | Steam | Gas |
-| 8 | Wood | Solid |
-| 9 | Ash | Powder |
-| 11 | Lava | Liquid |
-| 166 | Acid | Liquid |
+| ID | Material | Phase | Category |
+|----|----------|-------|----------|
+| 0 | Air | Gas | Natural |
+| 1 | Stone | Solid | Natural |
+| 2 | Sand | Powder | Natural |
+| 3 | Water | Liquid | Natural |
+| 4 | Oil | Liquid | Natural |
+| 5 | Fire | Gas | Energy |
+| 6 | Smoke | Gas | Energy |
+| 7 | Steam | Gas | Energy |
+| 8 | Wood | Solid | Organic |
+| 9 | Ash | Powder | Natural |
+| 11 | Lava | Liquid | Energy |
+| 12 | Gunpowder | Powder | Explosive |
+| 13 | Sealed-Metal | Solid | Explosive |
+| 14 | Glass | Solid | Synthetic |
+| 50 | Iron | Solid | Metal |
+| 51 | Copper | Solid | Metal |
+| 54 | Aluminum | Solid | Metal |
+| 55 | Tin | Solid | Metal |
+| 56 | Lead | Solid | Metal |
+| 80 | Iron Ore | Solid | Metal |
+| 131 | Spark | Gas | Energy |
+| 132 | Ember | Gas | Energy |
+| 166 | Acid | Liquid | Natural |
+| 550 | Copper Wire | Solid | Electrical |
+| 551 | Resistor Paste | Solid | Electrical |
+| 552 | Insulator Coat | Solid | Electrical |
+| 553 | Signal Sand | Powder | Electrical |
+| 554 | Toggle-ite Off | Solid | Electrical |
+| 555 | Toggle-ite On | Solid | Electrical |
+| 556 | Power Source | Solid | Electrical |
+| 557 | Ground | Solid | Electrical |
+| 558 | LED Crystal | Solid | Electrical |
+| 559 | Fuse Wire | Solid | Electrical |

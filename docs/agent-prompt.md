@@ -1,12 +1,16 @@
 # ALKAHEST: Agent Implementation Prompt
 
-**Version:** 0.1.0
-**Date:** 2026-02-13
-**Status:** Ready for execution
+**Version:** 1.0.0
+**Date:** 2026-02-16
+**Status:** Historical — all milestones complete
 
 ---
 
 ## Preamble
+
+**All 16 milestones (M0-M15) have been implemented.** This document is now a historical reference for the development methodology used during the initial build. The per-milestone execution guides below remain useful as context for understanding design decisions and constraints that shaped the codebase.
+
+For ongoing maintenance and extension, see the "Maintenance & Extension Guide" section at the end of this document.
 
 You are the lead implementation agent for Alkahest, a browser-based 3D voxel cellular automata sandbox. You have six companion documents that constitute the complete project specification. You must read and internalize all six before writing any code.
 
@@ -365,4 +369,38 @@ Before writing any code, verify:
 - [ ] You understand the milestone dependency graph (milestones.md Section 18) and can explain the critical path.
 - [ ] You have identified the constraints relevant to M0 (technical-constraints.md Appendix A) and can list them from memory.
 
-Begin with Milestone 0.
+All milestones are complete. See the Maintenance & Extension Guide below for ongoing work.
+
+---
+
+## Maintenance & Extension Guide
+
+With all milestones complete, the following guide covers the most common extension tasks.
+
+### Adding New Materials
+
+1. Choose the appropriate category file in `data/materials/` (naturals, metals, organics, energy, synthetics, exotic, explosives, electrical).
+2. Assign an ID in the base range (next available after 559, the current maximum). Mod materials use IDs >= 10000.
+3. Define all required properties: `id`, `name`, `phase`, `density`, `color`. Add optional properties as needed (thermal_conductivity, structural_integrity, electrical_conductivity, etc.).
+4. Run rule validation: the loader will reject out-of-range properties.
+5. Add interaction rules in the appropriate `data/rules/` file(s). Common rule files: combustion.ron, phase_change.ron, dissolution.ron, synthesis.ron, thermal.ron, displacement.ron, structural.ron, biological.ron, electrical.ron.
+6. Run the balancing test suite to verify no degenerate behaviors (infinite loops, energy-from-nothing, unbounded temperature).
+
+### Adding New Interaction Rules
+
+1. Choose the appropriate rule file in `data/rules/` based on the interaction type.
+2. Define the rule with `name`, `input_a`, `input_b`, `output_a`, `output_b`, and `probability` (required fields).
+3. Add conditional fields as needed: `min_temp`, `max_temp`, `temp_delta`, `pressure_delta`, `min_charge`, `max_charge`.
+4. The rule compiler creates bidirectional GPU entries automatically.
+5. Validation enforces: no energy-from-nothing (`temp_delta > 0` without material transform is rejected), no infinite loops (A->B->A cycles with overlapping temperature ranges).
+
+### Adding a New Simulation Pass
+
+This is a significant change. Follow these steps:
+
+1. Create the compute shader in `shaders/sim/` with the standard header comment documenting buffers, workgroup size, and rationale.
+2. Add the pass dispatch to `alkahest-sim/pipeline.rs`, inserting it in the correct position in the 7-pass sequence (Commands, Movement, Reactions, Thermal, Electrical, Pressure, Activity Scan).
+3. Update the bind group layouts if the pass needs new GPU buffers.
+4. Update `CLAUDE.md` and this document to reflect the new pass order.
+5. Write deterministic snapshot tests verifying the pass's behavior in isolation and in combination with existing passes.
+6. Profile the performance impact — the pass must not push total frame time above budget.

@@ -18,13 +18,13 @@ All project decisions are documented. Read before coding:
 
 ## Current Milestone
 
-Check git log or the most recently modified milestone-tagged code to determine the current milestone. Only work on the current milestone. Do not create files, stubs, traits, or placeholders for future milestones. See `docs/project-structure.md` Section 12 for what NOT to create.
+All milestones (M0-M15) are complete. The project is in maintenance mode. New work should focus on bug fixes, performance improvements, and content additions (new materials and rules via data files).
 
 ## Critical Rules — Violating These Breaks the Project
 
 1. **Never read and write the same voxel buffer in one pass.** Double-buffer swap every tick. This is non-negotiable (C-SIM-1).
 2. **Never hardcode material behavior in shaders.** All material logic is data-driven via the material property buffer and interaction matrix. No `if (material == SAND)` in WGSL (C-DESIGN-1).
-3. **Never scaffold future milestones.** No `todo!()`, no `unimplemented!()`, no empty files, no placeholder traits. Every file contains functional, tested code for the current milestone.
+3. **Never scaffold unneeded features.** No `todo!()`, no `unimplemented!()`, no empty files, no placeholder traits. Every file contains functional, tested code.
 4. **Never use `unwrap()` on fallible operations.** Use `expect("descriptive message")` for logically unreachable cases. Use `Result` propagation for runtime-fallible operations (C-RUST-5).
 5. **Never allocate GPU resources per frame.** Buffers, pipelines, bind groups, and textures are created at init or load time and reused (C-PERF-2).
 6. **Never iterate over individual voxels on the CPU at runtime.** All per-voxel work runs in GPU compute shaders. The CPU operates on chunks, not voxels (C-PERF-1).
@@ -66,8 +66,8 @@ crates/
   alkahest-bench/    Benchmarks. Native only, not shipped.
 shaders/
   common/            Shared WGSL (types, coords, rng). Concatenated into other shaders.
-  render/            Ray march, lighting, debug lines.
-  sim/               Compute shaders for each simulation pass.
+  render/            Ray march (with AO, transparency, LOD), sky, debug lines, blit.
+  sim/               Compute shaders: commands, movement, reactions, thermal, electrical, pressure, activity.
 data/
   materials/         Material definitions (RON).
   rules/             Interaction rules (RON).
@@ -104,10 +104,11 @@ Every tick executes in this exact order. Do not reorder.
 
 1. **Commands** — Apply player tool actions from the command buffer
 2. **Movement** — Gravity, density displacement, liquid flow, gas rise (directional sub-passes with checkerboard conflict resolution)
-3. **Reactions** — Interaction matrix evaluation, byproduct spawning, state transitions
+3. **Reactions** — Interaction matrix evaluation, byproduct spawning, state transitions (including charge-gated rules)
 4. **Thermal** — Heat diffusion, entropy drain, convection bias
-5. **Pressure** — Pressure accumulation, diffusion, rupture detection
-6. **Activity Scan** — Per-chunk dirty flag for chunk sleep/wake
+5. **Electrical** — Charge propagation through conductive materials, resistance-based Joule heating, charge decay
+6. **Pressure** — Pressure accumulation, diffusion, rupture detection
+7. **Activity Scan** — Per-chunk dirty flag for chunk sleep/wake
 
 Each pass reads from the current buffer and writes to the next buffer. Swap after all passes complete.
 
@@ -140,7 +141,6 @@ Each pass reads from the current buffer and writes to the next buffer. Swap afte
 
 ## Common Mistakes to Avoid
 
-- **Creating files for future milestones.** If it's not in the current milestone's column in `docs/project-structure.md` Section 8, don't create it.
 - **Using `std::time` in WASM.** Use `performance.now()` via web-sys, wrapped in a utility function.
 - **Forgetting cross-origin isolation headers.** SharedArrayBuffer requires `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` on the server.
 - **Blocking the frame loop on `mapAsync`.** GPU readback is async. Fire on frame N, process results on frame N+1 or N+2. Never await in the render loop.
@@ -148,7 +148,8 @@ Each pass reads from the current buffer and writes to the next buffer. Swap afte
 - **Putting temperature comparisons in float space.** Threshold comparisons are integer comparisons against pre-quantized values in the rule buffer.
 - **Tight coupling between simulation passes.** Passes communicate only through the voxel state buffer. No side-channel buffers between passes (C-DESIGN-2).
 - **Premature abstraction.** No traits with one implementation. No generics that aren't generic over anything yet. Concrete code first, abstractions when a second implementation demands them (C-DESIGN-4).
+- **Adding files without tests.** Every new feature must have corresponding automated tests. No untested code paths.
 
 ## When in Doubt
 
-Read `docs/technical-constraints.md` Appendix A for the current milestone's constraint list. Read the relevant sections of `docs/architecture.md`. If a design question isn't answered by the documentation, flag it rather than guessing — a wrong assumption in the simulation pipeline propagates to every later milestone.
+Read `docs/technical-constraints.md` for the constraint list. Read the relevant sections of `docs/architecture.md`. If a design question isn't answered by the documentation, flag it rather than guessing — a wrong assumption in the simulation pipeline can propagate widely.
