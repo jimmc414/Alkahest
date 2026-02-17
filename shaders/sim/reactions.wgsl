@@ -1,5 +1,6 @@
-// reactions.wgsl — Pass 3: Pairwise reactions and self-decay (M5: multi-chunk).
+// reactions.wgsl — Pass 3: Pairwise reactions and self-decay (M5: multi-chunk, M15: charge conditions).
 // Reads write_pool (post-movement state) + materials + rule_lookup + rule_data.
+// Reads charge_read (@group(1)) for charge-gated reactions (M15).
 // Writes write_pool (own voxel only — no cross-voxel writes).
 //
 // Workgroup: 8x8x4 = 256 threads.
@@ -48,6 +49,9 @@ struct SimCommand {
 @group(0) @binding(6) var<storage, read> rule_data: array<vec4<u32>>;
 @group(0) @binding(7) var<storage, read> chunk_descriptors: array<u32>;
 
+// M15: Charge buffer for charge-gated reactions (separate bind group to stay within C-GPU-3 limit)
+@group(1) @binding(0) var<storage, read> charge_read: array<u32>;
+
 @compute @workgroup_size(8, 8, 4)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let chunk_idx = gid.z / CHUNK_SIZE;
@@ -67,6 +71,10 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     }
 
     var my_temp = unpack_temperature(voxel);
+
+    // Read charge for this voxel (M15: same index mapping as charge_buf_index in electrical.wgsl)
+    let slot_offset = chunk_descriptors[chunk_idx * CHUNK_DESC_STRIDE];
+    let my_charge = charge_read[(slot_offset / 8u) + voxel_index(pos)];
 
     // --- Self-decay ---
     let props_1 = materials[mat_id * 4u + 1u];
@@ -129,6 +137,16 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
             continue;
         }
         if max_temp > 0u && my_temp > max_temp {
+            continue;
+        }
+
+        // M15: Charge condition checks (rule_0.z = min_charge, rule_1.y = max_charge)
+        let min_charge_rule = rule_0.z;
+        let max_charge_rule = rule_1.y;
+        if min_charge_rule > 0u && my_charge < min_charge_rule {
+            continue;
+        }
+        if max_charge_rule > 0u && my_charge > max_charge_rule {
             continue;
         }
 

@@ -1,6 +1,10 @@
+// Superseded by electrical::create_charge_reaction_pipeline and
+// electrical::dispatch_reactions_with_charge (M15), but retained for reference.
+#![allow(dead_code)]
+
 use alkahest_core::constants::CHUNK_SIZE;
 
-/// Create the reaction compute pipeline.
+/// Create the reaction compute pipeline (single bind group, no charge conditions).
 pub fn create_reaction_pipeline(
     device: &wgpu::Device,
     bind_group_layout: &wgpu::BindGroupLayout,
